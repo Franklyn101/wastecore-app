@@ -1,0 +1,187 @@
+import { Router } from "express"
+import multer from "multer"
+import { z } from "zod"
+import { currentUser, requireUser } from "../auth.ts"
+import {
+  BAG_SIZES,
+  bagSizeIds,
+  INSTANT_PICKUP,
+  MAX_BAG_PACKS,
+  UPGRADE_PLANS,
+  upgradePlanIds,
+  WEEKLY_PLANS,
+  weeklyPlanIds,
+} from "../catalog.ts"
+import { prisma } from "../db.ts"
+import type { OrderType } from "../generated/prisma/client.ts"
+import { HttpError } from "../http.ts"
+import { withUniqueReference } from "../references.ts"
+import { customerOrder } from "../serializers.ts"
+import { ALLOWED_IMAGE_TYPES, saveReceipt } from "../storage.ts"
+import { futureDateSchema, todayInLagos, trimmed } from "../validation.ts"
+
+const address = trimmed(300, "Address")
+const wasteType = trimmed(100, "Waste type")
+
+// One schema per service, mirroring the WhatsApp bot's flows.
+const createOrderSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("INSTANT_PICKUP"), address, wasteType, pickupDate: futureDateSchema }),
+  z.object({
+    type: z.literal("WEEKLY_PICKUP"),
+    plan: z.enum(weeklyPlanIds, "Choose a weekly plan."),
+    address,
+    wasteType,
+    pickupDate: futureDateSchema,
+  }),
+  z.object({
+    type: z.literal("UPGRADE"),
+    plan: z.enum(upgradePlanIds, "Choose an upgrade plan."),
+    address,
+    startDate: futureDateSchema,
+  }),
+  z.object({
+    type: z.literal("WASTE_BAGS"),
+    bagSize: z.enum(bagSizeIds, "Choose a bag size."),
+    quantity: z.coerce
+      .number()
+      .int("Quantity must be a whole number.")
+      .min(1, "Order at least 1 pack.")
+      .max(MAX_BAG_PACKS, `You can order at most ${MAX_BAG_PACKS} packs.`),
+    address,
+  }),
+])
+
+type CreateOrder = z.infer<typeof createOrderSchema>
+
+/** Prices the order from the catalog. The client never sends an amount. */
+function orderData(body: CreateOrder) {
+  const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id)!
+  switch (body.type) {
+    case "INSTANT_PICKUP":
+      return {
+        type: body.type as OrderType,
+        plan: INSTANT_PICKUP.id,
+        address: body.address,
+        wasteType: body.wasteType,
+        scheduledDate: body.pickupDate,
+        quantity: 1,
+        amount: INSTANT_PICKUP.price,
+      }
+    case "WEEKLY_PICKUP":
+      return {
+        type: body.type as OrderType,
+        plan: body.plan,
+        address: body.address,
+        wasteType: body.wasteType,
+        scheduledDate: body.pickupDate,
+        quantity: 1,
+        amount: find(WEEKLY_PLANS, body.plan).price,
+      }
+    case "UPGRADE":
+      return {
+        type: body.type as OrderType,
+        plan: body.plan,
+        address: body.address,
+        wasteType: null,
+        scheduledDate: body.startDate,
+        quantity: 1,
+        amount: find(UPGRADE_PLANS, body.plan).price,
+      }
+    case "WASTE_BAGS":
+      return {
+        type: body.type as OrderType,
+        plan: body.bagSize,
+        address: body.address,
+        wasteType: null,
+        scheduledDate: todayInLagos(),
+        quantity: body.quantity,
+        amount: find(BAG_SIZES, body.bagSize).price * body.quantity,
+      }
+  }
+}
+
+/** Checks the file's leading bytes, since the client-declared type can't be trusted. */
+function looksLikeImage(buf: Buffer): boolean {
+  const ascii = (start: number, end: number) => buf.subarray(start, end).toString("ascii")
+  return (
+    (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) || // JPEG
+    buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) || // PNG
+    (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") ||
+    ascii(4, 8) === "ftyp" // HEIC/HEIF (iPhone photos)
+  )
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) =>
+    ALLOWED_IMAGE_TYPES.includes(file.mimetype)
+      ? cb(null, true)
+      : cb(new HttpError(400, "The receipt must be a JPEG, PNG, WEBP or HEIC image.")),
+})
+
+async function findOwnOrder(id: string | string[], userId: string) {
+  const order = await prisma.order.findFirst({ where: { id: String(id), userId } })
+  if (!order) throw new HttpError(404, "Order not found.")
+  return order
+}
+
+export const ordersRouter = Router()
+ordersRouter.use("/orders", requireUser)
+
+ordersRouter.post("/orders", async (req, res) => {
+  const user = currentUser(req)
+  const data = orderData(createOrderSchema.parse(req.body))
+  const order = await withUniqueReference("WC", (reference) =>
+    prisma.order.create({
+      data: { ...data, scheduledDate: new Date(`${data.scheduledDate}T00:00:00Z`), reference, userId: user.id },
+    }),
+  )
+  // Remember the address for next time, like the bot's returning-customer flow.
+  if (!user.address) await prisma.user.update({ where: { id: user.id }, data: { address: data.address } })
+  res.status(201).json({ order: customerOrder(order) })
+})
+
+ordersRouter.get("/orders", async (req, res) => {
+  const orders = await prisma.order.findMany({
+    where: { userId: currentUser(req).id },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  })
+  res.json({ orders: orders.map(customerOrder) })
+})
+
+ordersRouter.get("/orders/:id", async (req, res) => {
+  res.json({ order: customerOrder(await findOwnOrder(req.params.id, currentUser(req).id)) })
+})
+
+// Upload (or replace) the bank-transfer receipt. Moves the order to PENDING for an admin to verify.
+ordersRouter.post("/orders/:id/receipt", upload.single("receipt"), async (req, res) => {
+  const order = await findOwnOrder(req.params.id, currentUser(req).id)
+  if (order.status !== "AWAITING_PAYMENT" && order.status !== "PENDING") {
+    throw new HttpError(409, "This order can no longer take a receipt.")
+  }
+  if (!req.file) throw new HttpError(400, "Attach a photo of your payment receipt.")
+  if (!looksLikeImage(req.file.buffer)) throw new HttpError(400, "That file is not a valid image.")
+
+  const receiptUrl = await saveReceipt(req.file, order.reference)
+  // Conditional update so a concurrent cancel or admin change wins cleanly.
+  const updated = await prisma.order.updateMany({
+    where: { id: order.id, status: { in: ["AWAITING_PAYMENT", "PENDING"] } },
+    data: { receiptUrl, status: "PENDING", paidAt: new Date() },
+  })
+  if (updated.count === 0) throw new HttpError(409, "This order can no longer take a receipt.")
+  res.json({ order: customerOrder(await findOwnOrder(order.id, order.userId)) })
+})
+
+ordersRouter.post("/orders/:id/cancel", async (req, res) => {
+  const order = await findOwnOrder(req.params.id, currentUser(req).id)
+  const updated = await prisma.order.updateMany({
+    where: { id: order.id, status: "AWAITING_PAYMENT" },
+    data: { status: "CANCELLED" },
+  })
+  if (updated.count === 0) {
+    throw new HttpError(409, "Paid orders can't be cancelled in the app. Please contact support.")
+  }
+  res.json({ order: customerOrder(await findOwnOrder(order.id, order.userId)) })
+})

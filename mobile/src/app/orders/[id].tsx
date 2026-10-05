@@ -1,0 +1,215 @@
+import * as Clipboard from "expo-clipboard"
+import * as ImagePicker from "expo-image-picker"
+import { useLocalSearchParams } from "expo-router"
+import { useState } from "react"
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native"
+import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen } from "../../components/ui"
+import { api } from "../../lib/api"
+import { useCatalog } from "../../lib/catalog"
+import { formatDate, naira, ORDER_STATUS, ORDER_TYPE_LABELS } from "../../lib/format"
+import type { Order } from "../../lib/types"
+import { useFocusData } from "../../lib/useFocusData"
+import { useSubmit } from "../../lib/useSubmit"
+import { colors, font, radius, spacing } from "../../theme"
+
+const STEPS = ["Booked", "Paid", "Confirmed", "Done"] as const
+
+function progress(order: Order): number {
+  switch (order.status) {
+    case "AWAITING_PAYMENT":
+      return 0
+    case "PENDING":
+      return 1
+    case "ASSIGNED":
+      return 2
+    case "COMPLETED":
+      return 3
+    default:
+      return -1
+  }
+}
+
+function nextStepText(order: Order): string {
+  switch (order.status) {
+    case "AWAITING_PAYMENT":
+      return "Transfer the amount below, then upload a photo or screenshot of your receipt."
+    case "PENDING":
+      return "We're confirming your payment. You'll see the update here shortly."
+    case "ASSIGNED":
+      return order.type === "WASTE_BAGS"
+        ? "Payment confirmed. Your bags are on the way."
+        : "Payment confirmed and a collector has been assigned."
+    case "COMPLETED":
+      return "All done. Thank you for keeping your environment clean!"
+    case "INCOMPLETE":
+      return "This order couldn't be completed. Contact support if you need help."
+    case "CANCELLED":
+      return "This order was cancelled."
+  }
+}
+
+function confirm(title: string, message: string, action: string, onConfirm: () => void) {
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm()
+    return
+  }
+  Alert.alert(title, message, [
+    { text: "Keep order", style: "cancel" },
+    { text: action, style: "destructive", onPress: onConfirm },
+  ])
+}
+
+export default function OrderDetails() {
+  const { id } = useLocalSearchParams<{ id: string }>()
+  const { catalog } = useCatalog()
+  const { data, error, refreshing, refresh } = useFocusData(() => api.order(id))
+  const [order, setOrder] = useState<Order | null>(null)
+  const [copied, setCopied] = useState(false)
+  const upload = useSubmit()
+  const cancel = useSubmit()
+
+  // Prefer the result of the latest action over the last fetch.
+  const current = order && data && order.updatedAt >= data.order.updatedAt ? order : (data?.order ?? order)
+  if (!current) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
+
+  const status = ORDER_STATUS[current.status]
+  const step = progress(current)
+  const canUpload = current.status === "AWAITING_PAYMENT" || current.status === "PENDING"
+
+  async function pickReceipt(source: "library" | "camera") {
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], quality: 0.6 }
+    let result: ImagePicker.ImagePickerResult
+    if (source === "camera") {
+      const permission = await ImagePicker.requestCameraPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert("Camera access needed", "Allow camera access in Settings to photograph your receipt.")
+        return
+      }
+      result = await ImagePicker.launchCameraAsync(options)
+    } else {
+      result = await ImagePicker.launchImageLibraryAsync(options)
+    }
+    if (result.canceled || !result.assets[0]) return
+    const asset = result.assets[0]
+    void upload.submit(async () => setOrder((await api.uploadReceipt(current!.id, asset)).order))
+  }
+
+  async function copyAccountNumber() {
+    if (!catalog) return
+    await Clipboard.setStringAsync(catalog.bank.accountNumber)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Screen refreshing={refreshing} onRefresh={refresh}>
+      <Card>
+        <View style={styles.headerRow}>
+          <Text style={font.heading}>{ORDER_TYPE_LABELS[current.type]}</Text>
+          <Badge label={status.label} tone={status.tone} />
+        </View>
+        <Text style={font.muted}>{nextStepText(current)}</Text>
+        {step >= 0 ? (
+          <View style={styles.steps} accessibilityLabel={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
+            {STEPS.map((label, i) => (
+              <View key={label} style={styles.step}>
+                <View style={[styles.stepBar, i <= step && { backgroundColor: colors.primary }]} />
+                <Text style={[styles.stepLabel, i <= step && { color: colors.primary }]}>{label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </Card>
+
+      {current.status === "AWAITING_PAYMENT" && catalog ? (
+        <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
+          <Text style={font.heading}>Pay {naira(current.amount)}</Text>
+          <Row label="Bank" value={catalog.bank.bankName} />
+          <Row label="Account name" value={catalog.bank.accountName} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Copies the account number"
+            onPress={copyAccountNumber}
+            style={styles.copyRow}
+          >
+            <Text style={font.muted}>Account number</Text>
+            <Text style={[font.heading, { color: colors.primaryDark }]}>
+              {catalog.bank.accountNumber} {copied ? "✓ Copied" : "⧉"}
+            </Text>
+          </Pressable>
+          <Text style={font.muted}>Use {current.reference} as the transfer narration so we can match your payment.</Text>
+        </Card>
+      ) : null}
+
+      {canUpload ? (
+        <View style={{ gap: spacing.sm }}>
+          {upload.error ? <ErrorBanner message={upload.error} /> : null}
+          <Button
+            title={current.receiptUrl ? "Replace receipt" : "Upload payment receipt"}
+            onPress={() => void pickReceipt("library")}
+            loading={upload.busy}
+          />
+          {Platform.OS !== "web" ? (
+            <Button
+              title="Take a photo of the receipt"
+              variant="secondary"
+              onPress={() => void pickReceipt("camera")}
+              disabled={upload.busy}
+            />
+          ) : null}
+        </View>
+      ) : null}
+
+      <Card>
+        <Row label="Reference" value={current.reference} />
+        <Row label={current.type === "WASTE_BAGS" ? "Bags" : "Plan"} value={current.planLabel} />
+        {current.type === "WASTE_BAGS" ? <Row label="Packs" value={String(current.quantity)} /> : null}
+        {current.wasteType ? <Row label="Waste type" value={current.wasteType} /> : null}
+        <Row
+          label={current.type === "UPGRADE" ? "Start date" : current.type === "WASTE_BAGS" ? "Ordered" : "Pickup date"}
+          value={formatDate(current.scheduledDate)}
+        />
+        <Row label={current.type === "WASTE_BAGS" ? "Delivery address" : "Address"} value={current.address} />
+        <Row label="Amount" value={naira(current.amount)} />
+      </Card>
+
+      {current.receiptUrl ? (
+        <Card>
+          <Text style={font.label}>Your receipt</Text>
+          <Image
+            source={{ uri: current.receiptUrl }}
+            style={styles.receipt}
+            resizeMode="contain"
+            accessibilityLabel="Uploaded payment receipt"
+          />
+        </Card>
+      ) : null}
+
+      {current.status === "AWAITING_PAYMENT" ? (
+        <>
+          {cancel.error ? <ErrorBanner message={cancel.error} /> : null}
+          <Button
+            title="Cancel order"
+            variant="danger"
+            loading={cancel.busy}
+            onPress={() =>
+              confirm("Cancel this order?", "You haven't paid yet, so nothing will be charged.", "Cancel order", () =>
+                void cancel.submit(async () => setOrder((await api.cancelOrder(current.id)).order)),
+              )
+            }
+          />
+        </>
+      ) : null}
+    </Screen>
+  )
+}
+
+const styles = StyleSheet.create({
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
+  steps: { flexDirection: "row", gap: spacing.xs },
+  step: { flex: 1, gap: spacing.xs },
+  stepBar: { height: 4, borderRadius: 2, backgroundColor: colors.border },
+  stepLabel: { fontSize: 12, color: colors.textMuted, fontWeight: "600" },
+  copyRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  receipt: { width: "100%", height: 280, borderRadius: radius.md, backgroundColor: colors.background },
+})

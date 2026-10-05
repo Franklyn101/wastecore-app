@@ -1,0 +1,111 @@
+// WasteCore database schema.
+// Run `npm run db:migrate` after changing this file.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderType {
+  INSTANT_PICKUP
+  WEEKLY_PICKUP
+  UPGRADE
+  WASTE_BAGS
+}
+
+// AWAITING_PAYMENT -> (receipt uploaded) -> PENDING -> ASSIGNED -> COMPLETED
+// INCOMPLETE and CANCELLED are terminal states set by an admin
+// (a customer may cancel while AWAITING_PAYMENT).
+enum OrderStatus {
+  AWAITING_PAYMENT
+  PENDING
+  ASSIGNED
+  COMPLETED
+  INCOMPLETE
+  CANCELLED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String   @unique // E.164, e.g. +2348012345678
+  passwordHash String
+  role         Role     @default(CUSTOMER)
+  address      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders  Order[]
+  tickets SupportTicket[]
+}
+
+model Collector {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  area      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  reference     String      @unique // shown to customers, e.g. WC-4F7K2Q
+  userId        String
+  type          OrderType
+  // Catalog key of what was bought: instant, weekly_1..3, basic/standard/premium, small/medium/large.
+  plan          String
+  address       String
+  wasteType     String?
+  // Pickup date, plan start date, or (for bags) the order date.
+  scheduledDate DateTime    @db.Date
+  quantity      Int         @default(1)
+  amount        Int // naira, total due for this order
+  status        OrderStatus @default(AWAITING_PAYMENT)
+  receiptUrl    String?
+  paidAt        DateTime?
+  collectorId   String?
+  adminNote     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collector Collector? @relation(fields: [collectorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model SupportTicket {
+  id          String       @id @default(cuid())
+  reference   String       @unique // e.g. TKT-8H2M4D
+  userId      String
+  category    String
+  message     String
+  contactTime String
+  status      TicketStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

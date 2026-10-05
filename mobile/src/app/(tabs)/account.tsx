@@ -1,0 +1,60 @@
+import { useState } from "react"
+import { Alert, Platform, Text } from "react-native"
+import { Button, Card, ErrorBanner, Row, Screen, TextField } from "../../components/ui"
+import { api } from "../../lib/api"
+import { useAuth } from "../../lib/auth"
+import { font } from "../../theme"
+
+export default function Account() {
+  const { user, setUser, signOut } = useAuth()
+  const [name, setName] = useState(user?.name ?? "")
+  const [address, setAddress] = useState(user?.address ?? "")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const changed = name.trim() !== user?.name || address.trim() !== (user?.address ?? "")
+
+  async function save() {
+    setBusy(true)
+    setError(null)
+    setSaved(false)
+    try {
+      const res = await api.updateProfile({ name: name.trim(), ...(address.trim() ? { address: address.trim() } : {}) })
+      setUser(res.user)
+      setSaved(true)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function confirmSignOut() {
+    if (Platform.OS === "web") return void signOut()
+    Alert.alert("Sign out?", "You'll need your phone number and password to sign back in.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign out", style: "destructive", onPress: () => void signOut() },
+    ])
+  }
+
+  return (
+    <Screen>
+      <Card>
+        <Row label="Phone" value={user?.phone ?? ""} />
+      </Card>
+      {error ? <ErrorBanner message={error} /> : null}
+      <TextField label="Full name" value={name} onChangeText={setName} autoComplete="name" />
+      <TextField
+        label="Default pickup address"
+        value={address}
+        onChangeText={setAddress}
+        multiline
+        hint="Pre-filled when you book a pickup or order bags."
+      />
+      {saved && !changed ? <Text style={font.muted}>Saved.</Text> : null}
+      <Button title="Save changes" onPress={save} loading={busy} disabled={!changed || !name.trim()} />
+      <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
+    </Screen>
+  )
+}
