@@ -1,0 +1,373 @@
+import { useLocalSearchParams } from "expo-router"
+import { useEffect, useState } from "react"
+import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
+import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Section, TextField } from "../../../components/ui"
+import { api } from "../../../lib/api"
+import { confirmAction } from "../../../lib/dialogs"
+import { formatDate, naira, ORDER_STATUS, ORDER_TYPE_LABELS } from "../../../lib/format"
+import type { AdminOrder, Collector } from "../../../lib/types"
+import { useFocusData } from "../../../lib/useFocusData"
+import { useSubmit } from "../../../lib/useSubmit"
+import { colors, font, radius, spacing } from "../../../theme"
+
+type Update = Parameters<typeof api.admin.updateOrder>[1]
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Africa/Lagos",
+  })
+}
+
+/** wa.me wants the number without "+". */
+const whatsappUrl = (phone: string) => `https://wa.me/${phone.replace(/^\+/, "")}`
+
+export default function ManageOrder() {
+  const { id } = useLocalSearchParams<{ id: string }>()
+  const { data, error, refreshing, refresh, setData } = useFocusData(() => api.admin.order(id))
+  const collectors = useFocusData(() => api.admin.collectors())
+  const action = useSubmit()
+
+  const [collectorId, setCollectorId] = useState<string | null>(null)
+  const [changingCollector, setChangingCollector] = useState(false)
+  const [rejecting, setRejecting] = useState(false)
+  const [reason, setReason] = useState("")
+  const [adminNote, setAdminNote] = useState("")
+
+  const order = data?.order
+  useEffect(() => {
+    if (!order) return
+    setCollectorId(order.collector?.id ?? null)
+    setAdminNote(order.adminNote ?? "")
+  }, [order])
+
+  if (!order) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
+
+  const status = ORDER_STATUS[order.status]
+  const isBags = order.type === "WASTE_BAGS"
+  const isUpgrade = order.type === "UPGRADE"
+  const active = collectors.data?.collectors.filter((c) => c.active) ?? []
+
+  function update(body: Update, after?: () => void) {
+    void action.submit(async () => {
+      setData(await api.admin.updateOrder(order!.id, body))
+      after?.()
+    })
+  }
+
+  const done = isBags ? "Mark delivered" : isUpgrade ? "Mark plan activated" : "Mark completed"
+
+  return (
+    <Screen refreshing={refreshing} onRefresh={refresh}>
+      <Card>
+        <View style={styles.headerRow}>
+          <Text style={font.heading}>
+            {ORDER_TYPE_LABELS[order.type]} · {order.reference}
+          </Text>
+          <Badge label={status.label} tone={status.tone} />
+        </View>
+        <Text style={font.muted}>Booked {formatDateTime(order.createdAt)}</Text>
+      </Card>
+
+      {action.error ? <ErrorBanner message={action.error} /> : null}
+
+      <NextStep
+        order={order}
+        busy={action.busy}
+        collectors={active}
+        collectorId={collectorId}
+        setCollectorId={setCollectorId}
+        changingCollector={changingCollector}
+        setChangingCollector={setChangingCollector}
+        rejecting={rejecting}
+        setRejecting={setRejecting}
+        reason={reason}
+        setReason={setReason}
+        doneLabel={done}
+        update={update}
+      />
+
+      <Section title="Payment receipt">
+        {order.receiptUrl ? (
+          <Pressable
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Open receipt full size"
+            onPress={() => void Linking.openURL(order.receiptUrl!)}
+          >
+            <Image source={{ uri: order.receiptUrl }} style={styles.receipt} resizeMode="contain" />
+            <Text style={[font.muted, { marginTop: spacing.xs }]}>
+              Uploaded {order.paidAt ? formatDateTime(order.paidAt) : ""} · tap to open full size
+            </Text>
+          </Pressable>
+        ) : (
+          <Card>
+            <Text style={font.muted}>No receipt uploaded yet.</Text>
+          </Card>
+        )}
+      </Section>
+
+      <Section title="Customer">
+        <Card>
+          <Row label="Name" value={order.customer.name} />
+          <Row label="Phone" value={order.customer.phone} />
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Button
+              title="Call"
+              variant="secondary"
+              style={{ flex: 1 }}
+              onPress={() => void Linking.openURL(`tel:${order.customer.phone}`)}
+            />
+            <Button
+              title="WhatsApp"
+              variant="secondary"
+              style={{ flex: 1 }}
+              onPress={() => void Linking.openURL(whatsappUrl(order.customer.phone))}
+            />
+          </View>
+        </Card>
+      </Section>
+
+      <Section title="Order">
+        <Card>
+          <Row label={isBags ? "Bags" : "Plan"} value={order.planLabel} />
+          {isBags ? <Row label="Packs" value={String(order.quantity)} /> : null}
+          {order.wasteType ? <Row label="Waste type" value={order.wasteType} /> : null}
+          <Row
+            label={isUpgrade ? "Start date" : isBags ? "Ordered" : "Pickup date"}
+            value={formatDate(order.scheduledDate)}
+          />
+          <Row label={isBags ? "Deliver to" : "Address"} value={order.address} />
+          <Row label="Amount due" value={naira(order.amount)} />
+          {order.collector ? <Row label="Collector" value={`${order.collector.name} (${order.collector.area})`} /> : null}
+          {order.customerNote ? <Row label="Message to customer" value={order.customerNote} /> : null}
+        </Card>
+      </Section>
+
+      <Section title="Internal note">
+        <TextField
+          label="Only staff can see this"
+          value={adminNote}
+          onChangeText={setAdminNote}
+          multiline
+          maxLength={1000}
+          placeholder="e.g. Gate code, landmark, call before arriving"
+        />
+        {adminNote.trim() !== (order.adminNote ?? "") ? (
+          <Button
+            title="Save note"
+            variant="secondary"
+            loading={action.busy}
+            onPress={() => update({ adminNote: adminNote.trim() || null })}
+          />
+        ) : null}
+      </Section>
+
+      {order.status === "AWAITING_PAYMENT" || order.status === "PENDING" || order.status === "ASSIGNED" ? (
+        <Button
+          title="Cancel order"
+          variant="danger"
+          disabled={action.busy}
+          onPress={() =>
+            confirmAction(
+              `Cancel ${order.reference}?`,
+              order.paidAt
+                ? "The customer has paid. Arrange a refund separately before cancelling."
+                : "The customer hasn't paid for this order.",
+              "Cancel order",
+              () => update({ status: "CANCELLED" }),
+              { cancelText: "Keep order" },
+            )
+          }
+        />
+      ) : null}
+    </Screen>
+  )
+}
+
+type NextStepProps = {
+  order: AdminOrder
+  busy: boolean
+  collectors: Collector[]
+  collectorId: string | null
+  setCollectorId: (id: string) => void
+  changingCollector: boolean
+  setChangingCollector: (v: boolean) => void
+  rejecting: boolean
+  setRejecting: (v: boolean) => void
+  reason: string
+  setReason: (v: string) => void
+  doneLabel: string
+  update: (body: Update, after?: () => void) => void
+}
+
+/** The actions that make sense for the order's current status. */
+function NextStep(p: NextStepProps) {
+  const { order, busy, update } = p
+
+  const collectorPicker = (
+    <View style={{ gap: spacing.sm }}>
+      <Text style={font.label}>{order.type === "WASTE_BAGS" ? "Who delivers?" : "Assign a collector"}</Text>
+      {p.collectors.length === 0 ? (
+        <Text style={font.muted}>No active collectors. Add one in the Collectors tab.</Text>
+      ) : (
+        p.collectors.map((c) => (
+          <OptionCard
+            key={c.id}
+            title={c.name}
+            subtitle={`${c.area} · ${c.phone}`}
+            selected={p.collectorId === c.id}
+            onPress={() => p.setCollectorId(c.id)}
+          />
+        ))
+      )}
+    </View>
+  )
+
+  switch (order.status) {
+    case "AWAITING_PAYMENT":
+      return (
+        <Card>
+          <Text style={font.heading}>Waiting for payment</Text>
+          <Text style={font.muted}>
+            The customer hasn't uploaded a receipt. If {naira(order.amount)} has arrived in the account with reference{" "}
+            {order.reference}, you can mark it as paid.
+          </Text>
+          <Button
+            title="Mark as paid"
+            variant="secondary"
+            loading={busy}
+            onPress={() =>
+              confirmAction(
+                "Mark as paid?",
+                `Only do this if ${naira(order.amount)} is in the account.`,
+                "Mark as paid",
+                () => update({ status: "PENDING" }),
+                { destructive: false },
+              )
+            }
+          />
+        </Card>
+      )
+
+    case "PENDING":
+      if (p.rejecting) {
+        return (
+          <Card>
+            <Text style={font.heading}>Reject receipt</Text>
+            <Text style={font.muted}>The customer sees this message and can upload a new receipt.</Text>
+            <TextField
+              label="Reason"
+              value={p.reason}
+              onChangeText={p.setReason}
+              multiline
+              maxLength={1000}
+              placeholder={`e.g. The receipt shows ₦1,500 but the amount due is ${naira(order.amount)}.`}
+            />
+            <Button
+              title="Reject and notify customer"
+              variant="danger"
+              loading={busy}
+              disabled={!p.reason.trim()}
+              onPress={() =>
+                update({ status: "AWAITING_PAYMENT", customerNote: p.reason.trim() }, () => {
+                  p.setRejecting(false)
+                  p.setReason("")
+                })
+              }
+            />
+            <Button title="Back" variant="secondary" onPress={() => p.setRejecting(false)} />
+          </Card>
+        )
+      }
+      return (
+        <Card style={{ borderColor: colors.primary }}>
+          <Text style={font.heading}>Check the payment</Text>
+          <Text style={font.muted}>
+            Confirm {naira(order.amount)} arrived in the account (reference {order.reference}) and matches the receipt
+            below.
+          </Text>
+          {order.type === "UPGRADE" ? (
+            <Button
+              title="Confirm payment & activate plan"
+              loading={busy}
+              onPress={() => update({ status: "COMPLETED", customerNote: null })}
+            />
+          ) : (
+            <>
+              {collectorPicker}
+              <Button
+                title="Confirm payment & assign"
+                loading={busy}
+                disabled={!p.collectorId}
+                onPress={() => update({ collectorId: p.collectorId, customerNote: null })}
+              />
+            </>
+          )}
+          <Button title="Reject receipt" variant="danger" disabled={busy} onPress={() => p.setRejecting(true)} />
+        </Card>
+      )
+
+    case "ASSIGNED":
+      return (
+        <Card>
+          <Text style={font.heading}>{order.type === "WASTE_BAGS" ? "Out for delivery" : "Pickup scheduled"}</Text>
+          <Text style={font.muted}>
+            {order.collector?.name ?? "A collector"} is assigned for {formatDate(order.scheduledDate)}.
+          </Text>
+          {p.changingCollector ? (
+            <>
+              {collectorPicker}
+              <Button
+                title="Save collector"
+                loading={busy}
+                disabled={!p.collectorId || p.collectorId === order.collector?.id}
+                onPress={() => update({ collectorId: p.collectorId }, () => p.setChangingCollector(false))}
+              />
+            </>
+          ) : (
+            <>
+              <Button title={p.doneLabel} loading={busy} onPress={() => update({ status: "COMPLETED" })} />
+              <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                <Button
+                  title="Change collector"
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                  disabled={busy}
+                  onPress={() => p.setChangingCollector(true)}
+                />
+                <Button
+                  title="Mark incomplete"
+                  variant="danger"
+                  style={{ flex: 1 }}
+                  disabled={busy}
+                  onPress={() =>
+                    confirmAction(
+                      "Mark as incomplete?",
+                      "Use this when the pickup or delivery couldn't happen. The order will be closed.",
+                      "Mark incomplete",
+                      () => update({ status: "INCOMPLETE" }),
+                    )
+                  }
+                />
+              </View>
+            </>
+          )}
+        </Card>
+      )
+
+    default:
+      return (
+        <Card>
+          <Text style={font.muted}>This order is closed. No further actions.</Text>
+        </Card>
+      )
+  }
+}
+
+const styles = StyleSheet.create({
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  receipt: { width: "100%", height: 360, borderRadius: radius.md, backgroundColor: colors.surface },
+})

@@ -1,5 +1,16 @@
 import { Platform } from "react-native"
-import type { Catalog, Order, SupportTicket, User } from "./types"
+import type {
+  AdminOrder,
+  AdminSummary,
+  AdminTicket,
+  Catalog,
+  Collector,
+  Order,
+  OrderStatus,
+  SupportTicket,
+  TicketStatus,
+  User,
+} from "./types"
 
 // Set EXPO_PUBLIC_API_URL in mobile/.env. On a physical phone use your
 // computer's LAN address (e.g. http://192.168.1.20:4000), not localhost.
@@ -46,6 +57,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T
 }
 
+const patch = <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) })
+
+const query = (params: Record<string, string | undefined>) => {
+  const qs = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1])).toString()
+  return qs ? `?${qs}` : ""
+}
+
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) })
 
@@ -61,8 +79,7 @@ export const api = {
   register: (body: { name: string; phone: string; password: string }) => post<AuthResponse>("/auth/register", body),
   login: (body: { phone: string; password: string }) => post<AuthResponse>("/auth/login", body),
   me: () => request<{ user: User }>("/me"),
-  updateProfile: (body: { name?: string; address?: string }) =>
-    request<{ user: User }>("/me", { method: "PATCH", body: JSON.stringify(body) }),
+  updateProfile: (body: { name?: string; address?: string }) => patch<{ user: User }>("/me", body),
 
   catalog: () => request<Catalog>("/catalog"),
 
@@ -86,4 +103,23 @@ export const api = {
   createTicket: (body: { category: string; message: string; contactTime: string }) =>
     post<{ ticket: SupportTicket }>("/support-tickets", body),
   tickets: () => request<{ tickets: SupportTicket[] }>("/support-tickets"),
+
+  admin: {
+    summary: () => request<AdminSummary>("/admin/summary"),
+    orders: (params: { status?: OrderStatus; q?: string } = {}) =>
+      request<{ orders: AdminOrder[] }>(`/admin/orders${query(params)}`),
+    order: (id: string) => request<{ order: AdminOrder }>(`/admin/orders/${id}`),
+    updateOrder: (
+      id: string,
+      body: { status?: OrderStatus; collectorId?: string | null; adminNote?: string | null; customerNote?: string | null },
+    ) => patch<{ order: AdminOrder }>(`/admin/orders/${id}`, body),
+    collectors: () => request<{ collectors: Collector[] }>("/admin/collectors"),
+    createCollector: (body: { name: string; phone: string; area: string }) =>
+      post<{ collector: Collector }>("/admin/collectors", body),
+    updateCollector: (id: string, body: Partial<Omit<Collector, "id">>) =>
+      patch<{ collector: Collector }>(`/admin/collectors/${id}`, body),
+    tickets: (status?: TicketStatus) => request<{ tickets: AdminTicket[] }>(`/admin/support-tickets${query({ status })}`),
+    updateTicket: (id: string, status: TicketStatus) =>
+      patch<{ ticket: SupportTicket }>(`/admin/support-tickets/${id}`, { status }),
+  },
 }

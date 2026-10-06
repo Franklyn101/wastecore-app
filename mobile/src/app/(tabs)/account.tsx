@@ -1,8 +1,9 @@
 import { useState } from "react"
-import { Alert, Platform, Text } from "react-native"
+import { Text } from "react-native"
 import { Button, Card, ErrorBanner, Row, Screen, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
+import { confirmAction } from "../../lib/dialogs"
 import { font } from "../../theme"
 
 export default function Account() {
@@ -31,11 +32,7 @@ export default function Account() {
   }
 
   function confirmSignOut() {
-    if (Platform.OS === "web") return void signOut()
-    Alert.alert("Sign out?", "You'll need your phone number and password to sign back in.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => void signOut() },
-    ])
+    confirmAction("Sign out?", "You'll need your phone number and password to sign back in.", "Sign out", () => void signOut())
   }
 
   return (

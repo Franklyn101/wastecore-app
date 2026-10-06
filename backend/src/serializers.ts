@@ -18,6 +18,7 @@ export function customerOrder(order: Order) {
     amount: order.amount,
     status: order.status,
     receiptUrl: order.receiptUrl,
+    customerNote: order.customerNote,
     paidAt: order.paidAt,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,

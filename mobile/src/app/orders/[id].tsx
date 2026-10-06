@@ -6,6 +6,7 @@ import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useCatalog } from "../../lib/catalog"
+import { confirmAction } from "../../lib/dialogs"
 import { formatDate, naira, ORDER_STATUS, ORDER_TYPE_LABELS } from "../../lib/format"
 import type { Order } from "../../lib/types"
 import { useFocusData } from "../../lib/useFocusData"
@@ -46,17 +47,6 @@ function nextStepText(order: Order): string {
     case "CANCELLED":
       return "This order was cancelled."
   }
-}
-
-function confirm(title: string, message: string, action: string, onConfirm: () => void) {
-  if (Platform.OS === "web") {
-    if (window.confirm(`${title}\n\n${message}`)) onConfirm()
-    return
-  }
-  Alert.alert(title, message, [
-    { text: "Keep order", style: "cancel" },
-    { text: action, style: "destructive", onPress: onConfirm },
-  ])
 }
 
 export default function OrderDetails() {
@@ -121,6 +111,13 @@ export default function OrderDetails() {
         ) : null}
       </Card>
 
+      {current.customerNote ? (
+        <Card style={{ backgroundColor: colors.warningSoft, borderColor: colors.warning }}>
+          <Text style={font.label}>Message from WasteCore</Text>
+          <Text style={font.body}>{current.customerNote}</Text>
+        </Card>
+      ) : null}
+
       {current.status === "AWAITING_PAYMENT" && catalog ? (
         <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
           <Text style={font.heading}>Pay {naira(current.amount)}</Text>
@@ -145,7 +142,13 @@ export default function OrderDetails() {
         <View style={{ gap: spacing.sm }}>
           {upload.error ? <ErrorBanner message={upload.error} /> : null}
           <Button
-            title={current.receiptUrl ? "Replace receipt" : "Upload payment receipt"}
+            title={
+              current.customerNote && current.status === "AWAITING_PAYMENT"
+                ? "Upload a new receipt"
+                : current.receiptUrl
+                  ? "Replace receipt"
+                  : "Upload payment receipt"
+            }
             onPress={() => void pickReceipt("library")}
             loading={upload.busy}
           />
@@ -193,8 +196,12 @@ export default function OrderDetails() {
             variant="danger"
             loading={cancel.busy}
             onPress={() =>
-              confirm("Cancel this order?", "You haven't paid yet, so nothing will be charged.", "Cancel order", () =>
-                void cancel.submit(async () => setOrder((await api.cancelOrder(current.id)).order)),
+              confirmAction(
+                "Cancel this order?",
+                "You haven't paid yet, so nothing will be charged.",
+                "Cancel order",
+                () => void cancel.submit(async () => setOrder((await api.cancelOrder(current.id)).order)),
+                { cancelText: "Keep order" },
               )
             }
           />

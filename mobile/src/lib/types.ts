@@ -25,6 +25,7 @@ export type Order = {
   amount: number
   status: OrderStatus
   receiptUrl: string | null
+  customerNote: string | null
   paidAt: string | null
   createdAt: string
   updatedAt: string
@@ -52,3 +53,15 @@ export type Catalog = {
   supportCategories: string[]
   bank: { bankName: string; accountName: string; accountNumber: string }
 }
+
+// Staff-only shapes from /admin endpoints.
+
+export type Customer = { id: string; name: string; phone: string }
+
+export type Collector = { id: string; name: string; phone: string; area: string; active: boolean }
+
+export type AdminOrder = Order & { adminNote: string | null; customer: Customer; collector: Collector | null }
+
+export type AdminTicket = SupportTicket & { customer: Customer }
+
+export type AdminSummary = { orders: Record<OrderStatus, number>; openTickets: number }

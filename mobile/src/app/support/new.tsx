@@ -1,9 +1,9 @@
 import { router } from "expo-router"
 import { useState } from "react"
-import { Alert, Platform } from "react-native"
 import { Button, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useCatalog } from "../../lib/catalog"
+import { notify } from "../../lib/dialogs"
 import { useSubmit } from "../../lib/useSubmit"
 
 export default function NewTicket() {
@@ -26,8 +26,7 @@ export default function NewTicket() {
         contactTime: contactTime.trim(),
       })
       const note = `Your ticket ID is ${ticket.reference}. A WasteCore agent will reach out shortly.`
-      if (Platform.OS === "web") window.alert(note)
-      else Alert.alert("Ticket raised", note)
+      notify("Ticket raised", note)
       router.back()
     })
   }

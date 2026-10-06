@@ -168,7 +168,7 @@ ordersRouter.post("/orders/:id/receipt", upload.single("receipt"), async (req, r
   // Conditional update so a concurrent cancel or admin change wins cleanly.
   const updated = await prisma.order.updateMany({
     where: { id: order.id, status: { in: ["AWAITING_PAYMENT", "PENDING"] } },
-    data: { receiptUrl, status: "PENDING", paidAt: new Date() },
+    data: { receiptUrl, status: "PENDING", paidAt: new Date(), customerNote: null },
   })
   if (updated.count === 0) throw new HttpError(409, "This order can no longer take a receipt.")
   res.json({ order: customerOrder(await findOwnOrder(order.id, order.userId)) })

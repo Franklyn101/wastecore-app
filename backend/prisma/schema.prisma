@@ -83,7 +83,8 @@ model Order {
   receiptUrl    String?
   paidAt        DateTime?
   collectorId   String?
-  adminNote     String?
+  adminNote     String? // internal, staff only
+  customerNote  String? // shown to the customer, e.g. why a receipt was rejected
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

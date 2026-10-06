@@ -177,3 +177,80 @@ describe("support and admin", () => {
     expect(mine.body.order.collector).toBeUndefined()
   })
 })
+
+describe("admin order workflow", () => {
+  async function setup() {
+    const customer = { Authorization: `Bearer ${await register()}` }
+    const admin = { Authorization: `Bearer ${await register("08099990000", "Staff")}` }
+    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
+    const { body } = await request(app)
+      .post("/orders")
+      .set(customer)
+      .send({ type: "INSTANT_PICKUP", address: "Ikeja", wasteType: "Paper", pickupDate: tomorrow })
+    const collector = await request(app)
+      .post("/admin/collectors")
+      .set(admin)
+      .send({ name: "Musa", phone: "07011112222", area: "Ikeja" })
+    return { customer, admin, orderId: body.order.id as string, collectorId: collector.body.collector.id as string }
+  }
+
+  const upload = (auth: Record<string, string>, id: string) =>
+    request(app)
+      .post(`/orders/${id}/receipt`)
+      .set(auth)
+      .attach("receipt", jpeg, { filename: "r.jpg", contentType: "image/jpeg" })
+
+  it("rejects a receipt with a message the customer can see, then accepts a new one", async () => {
+    const { customer, admin, orderId } = await setup()
+    await upload(customer, orderId)
+
+    const noReason = await request(app).patch(`/admin/orders/${orderId}`).set(admin).send({ status: "AWAITING_PAYMENT" })
+    expect(noReason.status).toBe(400)
+
+    const rejected = await request(app)
+      .patch(`/admin/orders/${orderId}`)
+      .set(admin)
+      .send({ status: "AWAITING_PAYMENT", customerNote: "Amount on the receipt is ₦1,500." })
+    expect(rejected.body.order.status).toBe("AWAITING_PAYMENT")
+
+    const mine = await request(app).get(`/orders/${orderId}`).set(customer)
+    expect(mine.body.order.customerNote).toBe("Amount on the receipt is ₦1,500.")
+    expect(mine.body.order.adminNote).toBeUndefined()
+
+    const again = await upload(customer, orderId)
+    expect(again.body.order).toMatchObject({ status: "PENDING", customerNote: null })
+  })
+
+  it("enforces the status flow", async () => {
+    const { customer, admin, orderId, collectorId } = await setup()
+    const patch = (body: object) => request(app).patch(`/admin/orders/${orderId}`).set(admin).send(body)
+
+    // Can't complete or assign an unpaid order.
+    expect((await patch({ status: "COMPLETED" })).status).toBe(409)
+    expect((await patch({ collectorId })).status).toBe(409)
+
+    await upload(customer, orderId)
+    expect((await patch({ status: "ASSIGNED" })).status).toBe(400) // needs a collector
+    const assigned = await patch({ collectorId, adminNote: "Gate code 1234" })
+    expect(assigned.body.order).toMatchObject({ status: "ASSIGNED", adminNote: "Gate code 1234" })
+    expect(assigned.body.order.collector.name).toBe("Musa")
+
+    const done = await patch({ status: "COMPLETED" })
+    expect(done.body.order.status).toBe("COMPLETED")
+    expect((await patch({ status: "PENDING" })).status).toBe(409) // terminal
+
+    const summary = await request(app).get("/admin/summary").set(admin)
+    expect(summary.body.orders.COMPLETED).toBe(1)
+  })
+
+  it("searches orders by reference, name and phone", async () => {
+    const { admin, orderId } = await setup()
+    const { body } = await request(app).get(`/admin/orders/${orderId}`).set(admin)
+    for (const q of [body.order.reference.toLowerCase(), "ada", "0801234"]) {
+      const res = await request(app).get("/admin/orders").query({ q }).set(admin)
+      expect(res.body.orders.map((o: { id: string }) => o.id)).toEqual([orderId])
+    }
+    const none = await request(app).get("/admin/orders").query({ q: "nobody" }).set(admin)
+    expect(none.body.orders).toHaveLength(0)
+  })
+})

@@ -209,7 +209,15 @@ export function Row({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  screenContent: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl },
+  // Capped and centered so screens stay readable in a desktop browser.
+  screenContent: {
+    padding: spacing.lg,
+    gap: spacing.lg,
+    paddingBottom: spacing.xxl,
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+  },
   button: {
     minHeight: 50,
     borderRadius: radius.md,
