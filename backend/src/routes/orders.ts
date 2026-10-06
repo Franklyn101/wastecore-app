@@ -1,14 +1,13 @@
 import { Router } from "express"
-import multer from "multer"
 import { z } from "zod"
-import { currentUser, requireUser } from "../auth.ts"
+import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { BAG_SIZES, bagSizeIds, INSTANT_PICKUP, MAX_BAG_PACKS } from "../catalog.ts"
 import { prisma } from "../db.ts"
 import type { OrderType } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
 import { withUniqueReference } from "../references.ts"
 import { customerOrder } from "../serializers.ts"
-import { ALLOWED_IMAGE_TYPES, saveReceipt } from "../storage.ts"
+import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
 import { addDays, toDay, ymd } from "../dates.ts"
 import { futureDateSchema, hourInLagos, todayInLagos, trimmed } from "../validation.ts"
 
@@ -78,26 +77,6 @@ function orderData(body: CreateOrder) {
   }
 }
 
-/** Checks the file's leading bytes, since the client-declared type can't be trusted. */
-function looksLikeImage(buf: Buffer): boolean {
-  const ascii = (start: number, end: number) => buf.subarray(start, end).toString("ascii")
-  return (
-    (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) || // JPEG
-    buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) || // PNG
-    (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") ||
-    ascii(4, 8) === "ftyp" // HEIC/HEIF (iPhone photos)
-  )
-}
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, cb) =>
-    ALLOWED_IMAGE_TYPES.includes(file.mimetype)
-      ? cb(null, true)
-      : cb(new HttpError(400, "The receipt must be a JPEG, PNG, WEBP or HEIC image.")),
-})
-
 async function findOwnOrder(id: string | string[], userId: string) {
   const order = await prisma.order.findFirst({ where: { id: String(id), userId } })
   if (!order) throw new HttpError(404, "Order not found.")
@@ -105,7 +84,7 @@ async function findOwnOrder(id: string | string[], userId: string) {
 }
 
 export const ordersRouter = Router()
-ordersRouter.use("/orders", requireUser)
+ordersRouter.use("/orders", requireUser, requireCustomer)
 
 ordersRouter.post("/orders", async (req, res) => {
   const user = currentUser(req)
@@ -135,7 +114,7 @@ ordersRouter.get("/orders/:id", async (req, res) => {
 })
 
 // Upload (or replace) the bank-transfer receipt. Moves the order to PENDING for an admin to verify.
-ordersRouter.post("/orders/:id/receipt", upload.single("receipt"), async (req, res) => {
+ordersRouter.post("/orders/:id/receipt", imageUpload.single("receipt"), async (req, res) => {
   const order = await findOwnOrder(req.params.id, currentUser(req).id)
   const canTakeReceipt =
     order.status === "AWAITING_PAYMENT" || (order.status === "PENDING" && order.paymentMethod === "TRANSFER")
@@ -145,7 +124,7 @@ ordersRouter.post("/orders/:id/receipt", upload.single("receipt"), async (req, r
   if (!req.file) throw new HttpError(400, "Attach a photo of your payment receipt.")
   if (!looksLikeImage(req.file.buffer)) throw new HttpError(400, "That file is not a valid image.")
 
-  const receiptUrl = await saveReceipt(req.file, order.reference)
+  const receiptUrl = await saveImage(req.file, order.reference, "receipts")
   // Conditional update so a concurrent cancel or admin change wins cleanly.
   const updated = await prisma.order.updateMany({
     where: { id: order.id, status: order.status },

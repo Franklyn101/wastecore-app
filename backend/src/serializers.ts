@@ -21,11 +21,19 @@ export function customerOrder(order: Order) {
     paymentMethod: order.paymentMethod,
     receiptUrl: order.receiptUrl,
     customerNote: order.customerNote,
+    onTheWayAt: order.onTheWayAt,
+    completedAt: order.completedAt,
+    collectorNote: order.collectorNote,
+    proofPhotoUrl: order.proofPhotoUrl,
     subscriptionId: order.subscriptionId,
     paidAt: order.paidAt,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
   }
+}
+
+export function adminCollector(c: Collector) {
+  return { id: c.id, name: c.name, phone: c.phone, area: c.area, active: c.active, hasLogin: Boolean(c.userId) }
 }
 
 export function adminOrder(
@@ -35,7 +43,32 @@ export function adminOrder(
     ...customerOrder(order),
     adminNote: order.adminNote,
     customer: order.user,
-    collector: order.collector,
+    collector: order.collector && adminCollector(order.collector),
+  }
+}
+
+/**
+ * A job as the collector sees it: what to collect or deliver, where, and who to call.
+ * No prices or payment details; staff notes (e.g. a gate code) are included.
+ */
+export function collectorJob(order: Order & { user: { name: string; phone: string } }) {
+  return {
+    id: order.id,
+    reference: order.reference,
+    type: order.type,
+    planLabel: planLabel(order.plan),
+    address: order.address,
+    wasteType: order.wasteType,
+    scheduledDate: dateOnly(order.scheduledDate),
+    asap: order.asap,
+    quantity: order.quantity,
+    status: order.status,
+    notes: order.adminNote,
+    customer: { name: order.user.name, phone: order.user.phone },
+    onTheWayAt: order.onTheWayAt,
+    completedAt: order.completedAt,
+    collectorNote: order.collectorNote,
+    proofPhotoUrl: order.proofPhotoUrl,
   }
 }
 
@@ -68,7 +101,7 @@ export function subscription(s: Subscription) {
 export function adminSubscription(
   s: Subscription & { collector: Collector | null; user: { id: string; name: string; phone: string } },
 ) {
-  return { ...subscription(s), customer: s.user, collector: s.collector }
+  return { ...subscription(s), customer: s.user, collector: s.collector && adminCollector(s.collector) }
 }
 
 export function ticket(t: SupportTicket) {

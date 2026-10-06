@@ -158,12 +158,16 @@ describe("support and admin", () => {
 
     expect((await request(app).get("/admin/orders").set(auth)).status).toBe(403)
 
-    await prisma.user.update({ where: { phone: "+2348012345678" }, data: { role: "ADMIN" } })
+    const admin = { Authorization: `Bearer ${await register("08099990000", "Staff")}` }
+    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
     const collector = await request(app)
       .post("/admin/collectors")
-      .set(auth)
+      .set(admin)
       .send({ name: "Musa", phone: "07011112222", area: "Ikeja" })
     expect(collector.status).toBe(201)
+
+    // Staff accounts can't place customer orders.
+    expect((await request(app).post("/orders").set(admin).send({})).status).toBe(403)
 
     const { body } = await request(app)
       .post("/orders")
@@ -172,7 +176,7 @@ describe("support and admin", () => {
     await prisma.order.update({ where: { id: body.order.id }, data: { status: "PENDING" } })
     const assigned = await request(app)
       .patch(`/admin/orders/${body.order.id}`)
-      .set(auth)
+      .set(admin)
       .send({ collectorId: collector.body.collector.id })
     expect(assigned.status).toBe(200)
     expect(assigned.body.order.status).toBe("ASSIGNED")

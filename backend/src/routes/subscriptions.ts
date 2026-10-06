@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { z } from "zod"
-import { currentUser, requireUser } from "../auth.ts"
+import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { planChangeQuote, RENEW_WINDOW_DAYS } from "../billing.ts"
 import { planIds } from "../catalog.ts"
 import { daysBetween, toDay, today } from "../dates.ts"
@@ -17,7 +17,7 @@ const createSchema = z.object({
 })
 
 export const subscriptionsRouter = Router()
-subscriptionsRouter.use("/subscriptions", requireUser)
+subscriptionsRouter.use("/subscriptions", requireUser, requireCustomer)
 
 async function findOwn(id: string | string[], userId: string) {
   const sub = await prisma.subscription.findFirst({ where: { id: String(id), userId } })

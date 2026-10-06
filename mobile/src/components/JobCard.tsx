@@ -1,0 +1,60 @@
+import { router } from "expo-router"
+import { Pressable, Text, View } from "react-native"
+import { daysUntil, formatDate } from "../lib/format"
+import type { CollectorJob } from "../lib/types"
+import { colors, font, radius, spacing } from "../theme"
+import { Badge } from "./ui"
+
+export const JOB_KIND: Record<CollectorJob["type"], string> = {
+  INSTANT_PICKUP: "Pickup",
+  PLAN_PICKUP: "Plan pickup",
+  WASTE_BAGS: "Bag delivery",
+}
+
+/** "3 bags · Plastic", "Medium bags × 2 packs", "Mixed". */
+export function jobLoad(job: CollectorJob): string {
+  if (job.type === "WASTE_BAGS") return `${job.planLabel} bags × ${job.quantity} pack${job.quantity === 1 ? "" : "s"}`
+  const bags = job.type === "INSTANT_PICKUP" ? `${job.quantity} bag${job.quantity === 1 ? "" : "s"}` : null
+  return [bags, job.wasteType].filter(Boolean).join(" · ")
+}
+
+/** One job in a collector's list. */
+export function JobCard({ job }: { job: CollectorJob }) {
+  const overdue = job.status === "ASSIGNED" && daysUntil(job.scheduledDate) < 0
+  const closed = job.status !== "ASSIGNED"
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${JOB_KIND[job.type]} for ${job.customer.name} at ${job.address}`}
+      onPress={() => router.push(`/collector/jobs/${job.id}`)}
+      style={({ pressed }) => ({
+        backgroundColor: colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: overdue ? colors.danger : colors.border,
+        padding: spacing.lg,
+        gap: spacing.xs,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm }}>
+        <Text style={font.label}>
+          {JOB_KIND[job.type]} · {job.customer.name}
+        </Text>
+        <View style={{ flexDirection: "row", gap: spacing.xs }}>
+          {job.asap && !closed ? <Badge label="ASAP" tone="warning" /> : null}
+          {overdue ? <Badge label="Overdue" tone="danger" /> : null}
+          {job.onTheWayAt && !closed ? <Badge label="On the way" tone="success" /> : null}
+          {job.status === "COMPLETED" ? <Badge label="Done" tone="success" /> : null}
+          {job.status === "INCOMPLETE" ? <Badge label="Not done" tone="danger" /> : null}
+          {job.status === "CANCELLED" ? <Badge label="Cancelled" tone="muted" /> : null}
+        </View>
+      </View>
+      <Text style={font.body}>{job.address}</Text>
+      <Text style={font.muted}>
+        {jobLoad(job) || "—"}
+        {closed && job.completedAt ? ` · ${formatDate(job.completedAt)}` : ""}
+      </Text>
+    </Pressable>
+  )
+}

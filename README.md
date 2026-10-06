@@ -38,6 +38,18 @@ Staff use the **same app**. When someone with an admin account signs in, they ge
 
 Admin accounts are created with `npm run db:create-admin` (see below). The server checks the role on every admin request; a customer who opens an admin link gets nothing.
 
+## Collector app
+
+Collectors (drivers) use the same app. Staff give a collector a login from **Collectors → (collector) → App login**: they set a password, and the collector signs in with their phone number. Deactivating a collector, or removing the login, stops them signing in.
+
+| Screen | What the collector does |
+| --- | --- |
+| **My jobs** | Their open pickups and bag deliveries, grouped Overdue / Today / Tomorrow / by date, with ASAP jobs flagged. Shows jobs done today and this week. |
+| **Job** | Customer name with **Call** and **WhatsApp**, the address with **Open in Maps**, what to collect or deliver, and staff notes (e.g. gate code). Tap **I'm on my way** (the customer sees "On the way"), then **Mark completed** with an optional photo and note, or **Couldn't complete** with a reason. |
+| **History** | Jobs they closed in the last 30 days, with their notes and photos. |
+
+Collectors only see jobs assigned to them, and never see prices or payment details. The customer sees the collector's note, the photo, and the reason if a pickup couldn't be done. Staff see all of it on the order, with times.
+
 ## Plans and payments
 
 **Subscriptions.** A customer picks a plan, address, waste type and first pickup date, then pays with Paystack. Once paid:
@@ -144,6 +156,12 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | PATCH | `/admin/orders/:id` | admin | `{ status?, collectorId?, adminNote?, customerNote? }`. Only valid status moves are accepted (see the lifecycle above). |
 | GET / POST / PATCH | `/admin/collectors` | admin | Manage collectors |
 | GET / PATCH | `/admin/support-tickets?status=` | admin | View and update tickets |
+| PUT / DELETE | `/admin/collectors/:id/login` | admin | `{ password }` creates the collector's app login or resets its password; DELETE removes it |
+| GET | `/collector/jobs` | collector | Open jobs, the last 30 days of closed jobs, and done-today/this-week counts |
+| GET | `/collector/jobs/:id` | collector | One of the collector's jobs |
+| POST | `/collector/jobs/:id/on-the-way` | collector | Tells the customer the collector is coming |
+| POST | `/collector/jobs/:id/complete` | collector | Multipart, with an optional `proof` photo and `note` |
+| POST | `/collector/jobs/:id/incomplete` | collector | `{ reason }` (shown to the customer) |
 | GET | `/admin/subscriptions` | admin | Active and expired customer plans |
 | PATCH | `/admin/subscriptions/:id` | admin | `{ collectorId }`: sets the plan's regular collector and assigns its upcoming pickups |
 
@@ -174,5 +192,4 @@ Set `EXPO_PUBLIC_API_URL` to the production API URL in your EAS environment.
 
 - **Deploy** the API and database, and turn on Cloudinary, so the team can test on real phones.
 - **Push notifications** (Expo Notifications) for "payment confirmed", "receipt rejected", "collector assigned" and "pickup completed", replacing the bot's WhatsApp templates.
-- **A collector role**, so drivers see only their own pickups and mark them done.
 - **Phone number verification** (SMS OTP) at sign-up, and password reset.

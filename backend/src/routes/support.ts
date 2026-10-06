@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { z } from "zod"
-import { currentUser, requireUser } from "../auth.ts"
+import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { SUPPORT_CATEGORIES } from "../catalog.ts"
 import { prisma } from "../db.ts"
 import { withUniqueReference } from "../references.ts"
@@ -14,7 +14,7 @@ const createTicketSchema = z.object({
 })
 
 export const supportRouter = Router()
-supportRouter.use("/support-tickets", requireUser)
+supportRouter.use("/support-tickets", requireUser, requireCustomer)
 
 supportRouter.post("/support-tickets", async (req, res) => {
   const body = createTicketSchema.parse(req.body)

@@ -9,10 +9,11 @@ function RootNavigator() {
   const { user, loading } = useAuth()
   if (loading) return <Loading />
 
-  // Customers and staff use the same app; the screens they can reach depend on their role.
+  // Customers, staff and collectors use the same app; the screens they can reach depend on their role.
   // The server checks the role on every admin request, so this only shapes the UI.
   const isCustomer = user?.role === "CUSTOMER"
   const isAdmin = user?.role === "ADMIN"
+  const isCollector = user?.role === "COLLECTOR"
 
   return (
     <Stack
@@ -42,6 +43,10 @@ function RootNavigator() {
         <Stack.Screen name="admin/orders/[id]" options={{ title: "Manage order" }} />
         <Stack.Screen name="admin/collector" options={{ title: "Collector" }} />
         <Stack.Screen name="admin/plans/[id]" options={{ title: "Customer plan" }} />
+      </Stack.Protected>
+      <Stack.Protected guard={isCollector}>
+        <Stack.Screen name="collector/(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="collector/jobs/[id]" options={{ title: "Job" }} />
       </Stack.Protected>
     </Stack>
   )

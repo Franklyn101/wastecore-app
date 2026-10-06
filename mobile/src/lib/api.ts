@@ -6,6 +6,8 @@ import type {
   AdminTicket,
   Catalog,
   Collector,
+  CollectorJob,
+  CollectorJobs,
   Order,
   OrderStatus,
   Payment,
@@ -71,6 +73,20 @@ const query = (params: Record<string, string | undefined>) => {
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) })
 
+export type PickedImage = { uri: string; mimeType?: string | null; fileName?: string | null }
+
+/** Adds a picked photo to a multipart form, on native and web. */
+async function appendImage(form: FormData, field: string, image: PickedImage) {
+  const type = image.mimeType ?? "image/jpeg"
+  const name = image.fileName ?? `${field}.${type.split("/")[1] ?? "jpg"}`
+  if (Platform.OS === "web") {
+    form.append(field, await (await fetch(image.uri)).blob(), name)
+  } else {
+    // React Native's FormData accepts a { uri, name, type } file descriptor.
+    form.append(field, { uri: image.uri, name, type } as unknown as Blob)
+  }
+}
+
 export type AuthResponse = { token: string; user: User }
 
 export type NewOrder =
@@ -89,18 +105,12 @@ export const api = {
   orders: () => request<{ orders: Order[] }>("/orders"),
   order: (id: string) => request<{ order: Order }>(`/orders/${id}`),
   cancelOrder: (id: string) => post<{ order: Order }>(`/orders/${id}/cancel`),
-  async uploadReceipt(id: string, image: { uri: string; mimeType?: string | null; fileName?: string | null }) {
-    const type = image.mimeType ?? "image/jpeg"
-    const name = image.fileName ?? `receipt.${type.split("/")[1] ?? "jpg"}`
+  async uploadReceipt(id: string, image: PickedImage) {
     const form = new FormData()
-    if (Platform.OS === "web") {
-      form.append("receipt", await (await fetch(image.uri)).blob(), name)
-    } else {
-      // React Native's FormData accepts a { uri, name, type } file descriptor.
-      form.append("receipt", { uri: image.uri, name, type } as unknown as Blob)
-    }
+    await appendImage(form, "receipt", image)
     return request<{ order: Order }>(`/orders/${id}/receipt`, { method: "POST", body: form })
   },
+
 
   subscriptions: () => request<{ subscriptions: Subscription[]; renewWindowDays: number }>("/subscriptions"),
   subscription: (id: string) =>
@@ -136,6 +146,10 @@ export const api = {
     setPlanCollector: (id: string, collectorId: string | null) =>
       patch<{ subscription: AdminSubscription }>(`/admin/subscriptions/${id}`, { collectorId }),
     collectors: () => request<{ collectors: Collector[] }>("/admin/collectors"),
+    setCollectorLogin: (id: string, password: string) =>
+      request<{ collector: Collector }>(`/admin/collectors/${id}/login`, { method: "PUT", body: JSON.stringify({ password }) }),
+    removeCollectorLogin: (id: string) =>
+      request<{ collector: Collector }>(`/admin/collectors/${id}/login`, { method: "DELETE" }),
     createCollector: (body: { name: string; phone: string; area: string }) =>
       post<{ collector: Collector }>("/admin/collectors", body),
     updateCollector: (id: string, body: Partial<Omit<Collector, "id">>) =>
@@ -143,5 +157,19 @@ export const api = {
     tickets: (status?: TicketStatus) => request<{ tickets: AdminTicket[] }>(`/admin/support-tickets${query({ status })}`),
     updateTicket: (id: string, status: TicketStatus) =>
       patch<{ ticket: SupportTicket }>(`/admin/support-tickets/${id}`, { status }),
+  },
+
+  collector: {
+    me: () => request<{ collector: { id: string; name: string; phone: string; area: string } }>("/collector/me"),
+    jobs: () => request<CollectorJobs>("/collector/jobs"),
+    job: (id: string) => request<{ job: CollectorJob }>(`/collector/jobs/${id}`),
+    onTheWay: (id: string) => post<{ job: CollectorJob }>(`/collector/jobs/${id}/on-the-way`),
+    async complete(id: string, input: { note?: string; photo?: PickedImage | null }) {
+      const form = new FormData()
+      if (input.note) form.append("note", input.note)
+      if (input.photo) await appendImage(form, "proof", input.photo)
+      return request<{ job: CollectorJob }>(`/collector/jobs/${id}/complete`, { method: "POST", body: form })
+    },
+    incomplete: (id: string, reason: string) => post<{ job: CollectorJob }>(`/collector/jobs/${id}/incomplete`, { reason }),
   },
 }

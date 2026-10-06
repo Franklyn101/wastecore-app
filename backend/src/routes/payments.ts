@@ -1,6 +1,6 @@
 import express, { Router } from "express"
 import { z } from "zod"
-import { currentUser, requireUser } from "../auth.ts"
+import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { paymentReference, recordPaystackResult, subscriptionCharge } from "../billing.ts"
 import { config } from "../config.ts"
 import { prisma } from "../db.ts"
@@ -62,7 +62,7 @@ paystackWebhook.post("/payments/paystack/webhook", express.raw({ type: "*/*", li
 })
 
 // Start a Paystack checkout for an unpaid order, a new plan, or a plan renewal.
-paymentsRouter.post("/payments", requireUser, async (req, res) => {
+paymentsRouter.post("/payments", requireUser, requireCustomer, async (req, res) => {
   const body = startSchema.parse(req.body)
   let user = currentUser(req)
 
@@ -98,7 +98,7 @@ paymentsRouter.post("/payments", requireUser, async (req, res) => {
 })
 
 // The app calls this after checkout closes to learn whether the payment went through.
-paymentsRouter.get("/payments/:reference", requireUser, async (req, res) => {
+paymentsRouter.get("/payments/:reference", requireUser, requireCustomer, async (req, res) => {
   const payment = await prisma.payment.findFirst({
     where: { reference: String(req.params.reference), userId: currentUser(req).id },
   })

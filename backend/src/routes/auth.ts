@@ -3,6 +3,7 @@ import { Router } from "express"
 import rateLimit from "express-rate-limit"
 import { z } from "zod"
 import { currentUser, publicUser, requireUser, signToken } from "../auth.ts"
+import { config } from "../config.ts"
 import { prisma } from "../db.ts"
 import { HttpError } from "../http.ts"
 import { phoneSchema, trimmed } from "../validation.ts"
@@ -39,7 +40,7 @@ export const authRouter = Router()
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: config.authRateLimit,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { error: "Too many attempts. Please wait a few minutes and try again." },
@@ -67,6 +68,10 @@ authRouter.post("/auth/login", authLimiter, async (req, res) => {
   const user = phone.success ? await prisma.user.findUnique({ where: { phone: phone.data } }) : null
   const valid = await bcrypt.compare(body.password, user?.passwordHash ?? DUMMY_HASH)
   if (!user || !valid) throw new HttpError(401, "Incorrect phone number or password.")
+  if (user.role === "COLLECTOR") {
+    const collector = await prisma.collector.findUnique({ where: { userId: user.id } })
+    if (!collector?.active) throw new HttpError(403, "Your collector account is inactive. Please contact the office.")
+  }
 
   res.json({ token: signToken(user), user: publicUser(user) })
 })

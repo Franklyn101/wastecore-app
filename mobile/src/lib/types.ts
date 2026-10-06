@@ -6,7 +6,7 @@ export type User = {
   phone: string
   email: string | null
   address: string | null
-  role: "CUSTOMER" | "ADMIN"
+  role: "CUSTOMER" | "ADMIN" | "COLLECTOR"
 }
 
 export type OrderType = "INSTANT_PICKUP" | "PLAN_PICKUP" | "WASTE_BAGS"
@@ -29,6 +29,10 @@ export type Order = {
   paymentMethod: "PAYSTACK" | "TRANSFER" | null
   receiptUrl: string | null
   customerNote: string | null
+  onTheWayAt: string | null
+  completedAt: string | null
+  collectorNote: string | null
+  proofPhotoUrl: string | null
   subscriptionId: string | null
   paidAt: string | null
   createdAt: string
@@ -116,7 +120,7 @@ export type Catalog = {
 
 export type Customer = { id: string; name: string; phone: string }
 
-export type Collector = { id: string; name: string; phone: string; area: string; active: boolean }
+export type Collector = { id: string; name: string; phone: string; area: string; active: boolean; hasLogin: boolean }
 
 export type AdminOrder = Order & { adminNote: string | null; customer: Customer; collector: Collector | null }
 
@@ -125,3 +129,30 @@ export type AdminSubscription = Subscription & { customer: Customer; collector: 
 export type AdminTicket = SupportTicket & { customer: Customer }
 
 export type AdminSummary = { orders: Record<OrderStatus, number>; openTickets: number; activePlans: number }
+
+// Collector app shapes from /collector endpoints.
+
+export type CollectorJob = {
+  id: string
+  reference: string
+  type: OrderType
+  planLabel: string
+  address: string
+  wasteType: string | null
+  scheduledDate: string
+  asap: boolean
+  quantity: number
+  status: OrderStatus
+  notes: string | null
+  customer: { name: string; phone: string }
+  onTheWayAt: string | null
+  completedAt: string | null
+  collectorNote: string | null
+  proofPhotoUrl: string | null
+}
+
+export type CollectorJobs = {
+  open: CollectorJob[]
+  history: CollectorJob[]
+  stats: { doneToday: number; doneThisWeek: number }
+}

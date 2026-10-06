@@ -13,6 +13,7 @@ datasource db {
 enum Role {
   CUSTOMER
   ADMIN
+  COLLECTOR // a driver; linked to a Collector record
 }
 
 enum OrderType {
@@ -81,6 +82,7 @@ model User {
   tickets       SupportTicket[]
   subscriptions Subscription[]
   payments      Payment[]
+  collector     Collector? // set when this login belongs to a collector
 }
 
 model Collector {
@@ -89,9 +91,11 @@ model Collector {
   phone     String
   area      String
   active    Boolean  @default(true)
+  userId    String?  @unique // the collector's app login, if staff have given them one
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   orders        Order[]
   subscriptions Subscription[]
 }
@@ -116,8 +120,13 @@ model Order {
   paidAt         DateTime?
   subscriptionId String?
   collectorId    String?
-  adminNote      String? // internal, staff only
+  adminNote      String? // staff notes, also shown to the assigned collector (e.g. gate code)
   customerNote   String? // shown to the customer, e.g. why a receipt was rejected
+  // Set by the collector on the job.
+  onTheWayAt     DateTime?
+  completedAt    DateTime?
+  collectorNote  String? // e.g. why a pickup couldn't be completed; shown to the customer
+  proofPhotoUrl  String? // photo taken at pickup or delivery
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 

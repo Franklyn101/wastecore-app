@@ -10,6 +10,8 @@ export const ymd = (date: Date) => date.toISOString().slice(0, 10)
 export const today = () => toDay(todayInLagos())
 export const addDays = (date: Date, days: number) => new Date(date.getTime() + days * DAY)
 export const daysBetween = (from: Date, to: Date) => Math.round((to.getTime() - from.getTime()) / DAY)
+/** The instant a Lagos calendar day starts (Lagos is UTC+1 all year). */
+export const startOfLagosDay = (day: Date) => new Date(day.getTime() - 3_600_000)
 export const maxDay = (a: Date, b: Date) => (a > b ? a : b)
 
 /** Start of the next billing period. Month periods keep the day of month, clamped (31 Jan -> 28 Feb). */

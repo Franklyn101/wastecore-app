@@ -41,9 +41,10 @@ export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: Tone }> = 
 }
 
 /** Status for display. An order paid online is already confirmed, so it reads differently. */
-export function orderStatus(order: Pick<Order, "status" | "paymentMethod" | "type">): { label: string; tone: Tone } {
+export function orderStatus(order: Pick<Order, "status" | "paymentMethod" | "type"> & { onTheWayAt?: string | null }): { label: string; tone: Tone } {
   if (order.status === "PENDING" && order.type === "PLAN_PICKUP") return { label: "Scheduled", tone: "info" }
   if (order.status === "PENDING" && order.paymentMethod === "PAYSTACK") return { label: "Paid · scheduling", tone: "info" }
+  if (order.status === "ASSIGNED" && order.onTheWayAt) return { label: "On the way", tone: "success" }
   return ORDER_STATUS[order.status]
 }
 

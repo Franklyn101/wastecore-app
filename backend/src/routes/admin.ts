@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs"
 import { Router } from "express"
 import { z } from "zod"
 import { requireAdmin, requireUser } from "../auth.ts"
@@ -5,7 +6,7 @@ import { prisma } from "../db.ts"
 import type { Prisma } from "../generated/prisma/client.ts"
 import { OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "../generated/prisma/enums.ts"
 import { HttpError } from "../http.ts"
-import { adminOrder, adminSubscription, ticket } from "../serializers.ts"
+import { adminCollector, adminOrder, adminSubscription, ticket } from "../serializers.ts"
 import { today } from "../dates.ts"
 import { phoneSchema, trimmed } from "../validation.ts"
 
@@ -107,6 +108,7 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
   const data: Prisma.OrderUncheckedUpdateManyInput = { status }
   if (body.adminNote !== undefined) data.adminNote = body.adminNote
   if (body.customerNote !== undefined) data.customerNote = body.customerNote
+  if (status !== order.status && (status === "COMPLETED" || status === "INCOMPLETE")) data.completedAt = new Date()
 
   if (body.collectorId !== undefined) {
     if (status !== "PENDING" && status !== "ASSIGNED") {
@@ -117,6 +119,8 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
       if (!collector?.active) throw new HttpError(400, "Choose an active collector.")
     }
     data.collectorId = body.collectorId
+    // A new collector hasn't set off yet.
+    if (body.collectorId !== order.collectorId) data.onTheWayAt = null
   }
   const collectorId = body.collectorId !== undefined ? body.collectorId : order.collectorId
   if (status === "ASSIGNED" && !collectorId) throw new HttpError(400, "Choose a collector to assign.")
@@ -176,19 +180,70 @@ adminRouter.patch("/admin/subscriptions/:id", async (req, res) => {
 })
 
 adminRouter.get("/admin/collectors", async (_req, res) => {
-  res.json({ collectors: await prisma.collector.findMany({ orderBy: [{ active: "desc" }, { name: "asc" }] }) })
+  const collectors = await prisma.collector.findMany({ orderBy: [{ active: "desc" }, { name: "asc" }] })
+  res.json({ collectors: collectors.map(adminCollector) })
 })
 
 adminRouter.post("/admin/collectors", async (req, res) => {
   const collector = await prisma.collector.create({ data: collectorSchema.parse(req.body) })
-  res.status(201).json({ collector })
+  res.status(201).json({ collector: adminCollector(collector) })
 })
+
+async function findCollector(id: string | string[]) {
+  const collector = await prisma.collector.findUnique({ where: { id: String(id) } })
+  if (!collector) throw new HttpError(404, "Collector not found.")
+  return collector
+}
+
+/** A phone number can only have one login, so a collector can't take over a customer's account. */
+async function assertPhoneFree(phone: string, exceptUserId?: string | null) {
+  const owner = await prisma.user.findUnique({ where: { phone } })
+  if (owner && owner.id !== exceptUserId) {
+    throw new HttpError(409, "This phone number already has a WasteCore account. Use a different number for the collector.")
+  }
+}
 
 adminRouter.patch("/admin/collectors/:id", async (req, res) => {
   const data = collectorSchema.partial().parse(req.body)
-  const existing = await prisma.collector.findUnique({ where: { id: req.params.id } })
-  if (!existing) throw new HttpError(404, "Collector not found.")
-  res.json({ collector: await prisma.collector.update({ where: { id: existing.id }, data }) })
+  const existing = await findCollector(req.params.id)
+  const updated = await prisma.$transaction(async (tx) => {
+    // The login uses the collector's phone number and name, so keep them in step.
+    if (existing.userId && (data.phone || data.name)) {
+      if (data.phone) await assertPhoneFree(data.phone, existing.userId)
+      await tx.user.update({ where: { id: existing.userId }, data: { phone: data.phone, name: data.name } })
+    }
+    return tx.collector.update({ where: { id: existing.id }, data })
+  })
+  res.json({ collector: adminCollector(updated) })
+})
+
+// Creates the collector's app login, or resets its password.
+adminRouter.put("/admin/collectors/:id/login", async (req, res) => {
+  const { password } = z
+    .object({ password: z.string().min(8, "Password must be at least 8 characters.").max(128) })
+    .parse(req.body)
+  const collector = await findCollector(req.params.id)
+  const passwordHash = await bcrypt.hash(password, 12)
+
+  if (collector.userId) {
+    await prisma.user.update({ where: { id: collector.userId }, data: { passwordHash } })
+  } else {
+    await assertPhoneFree(collector.phone)
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { name: collector.name, phone: collector.phone, passwordHash, role: "COLLECTOR" },
+      })
+      await tx.collector.update({ where: { id: collector.id }, data: { userId: user.id } })
+    })
+  }
+  res.json({ collector: adminCollector(await findCollector(collector.id)) })
+})
+
+// Removes the collector's app login. Their jobs and history stay.
+adminRouter.delete("/admin/collectors/:id/login", async (req, res) => {
+  const collector = await findCollector(req.params.id)
+  if (collector.userId) await prisma.user.delete({ where: { id: collector.userId } })
+  res.json({ collector: adminCollector(await findCollector(collector.id)) })
 })
 
 adminRouter.get("/admin/support-tickets", async (req, res) => {

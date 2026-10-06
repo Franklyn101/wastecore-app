@@ -120,6 +120,27 @@ export default function ManageOrder() {
         )}
       </Section>
 
+      {order.onTheWayAt || order.completedAt || order.collectorNote || order.proofPhotoUrl ? (
+        <Section title="From the collector">
+          <Card>
+            {order.onTheWayAt ? <Row label="On the way" value={formatDateTime(order.onTheWayAt)} /> : null}
+            {order.completedAt ? (
+              <Row label={order.status === "INCOMPLETE" ? "Closed (not done)" : "Completed"} value={formatDateTime(order.completedAt)} />
+            ) : null}
+            {order.collectorNote ? <Row label="Note" value={order.collectorNote} /> : null}
+            {order.proofPhotoUrl ? (
+              <Pressable
+                accessibilityRole="imagebutton"
+                accessibilityLabel="Open collector's photo full size"
+                onPress={() => void Linking.openURL(order.proofPhotoUrl!)}
+              >
+                <Image source={{ uri: order.proofPhotoUrl }} style={styles.receipt} resizeMode="contain" />
+              </Pressable>
+            ) : null}
+          </Card>
+        </Section>
+      ) : null}
+
       <Section title="Customer">
         <Card>
           <Row label="Name" value={order.customer.name} />
@@ -158,9 +179,9 @@ export default function ManageOrder() {
         </Card>
       </Section>
 
-      <Section title="Internal note">
+      <Section title="Notes for the collector">
         <TextField
-          label="Only staff can see this"
+          label="Seen by staff and the assigned collector"
           value={adminNote}
           onChangeText={setAdminNote}
           multiline

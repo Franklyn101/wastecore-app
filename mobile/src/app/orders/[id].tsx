@@ -41,6 +41,7 @@ function nextStepText(order: Order): string {
         ? "Payment received. We'll assign a collector shortly."
         : "We're confirming your payment. You'll see the update here shortly."
     case "ASSIGNED":
+      if (order.onTheWayAt) return order.type === "WASTE_BAGS" ? "Your bags are on the way." : "Your collector is on the way."
       return order.type === "WASTE_BAGS"
         ? "Payment confirmed. Your bags are on the way."
         : "Payment confirmed and a collector has been assigned."
@@ -120,6 +121,21 @@ export default function OrderDetails() {
           </View>
         ) : null}
       </Card>
+
+      {current.collectorNote || current.proofPhotoUrl ? (
+        <Card style={current.status === "INCOMPLETE" ? { backgroundColor: colors.dangerSoft, borderColor: colors.danger } : undefined}>
+          <Text style={font.label}>From your collector</Text>
+          {current.collectorNote ? <Text style={font.body}>{current.collectorNote}</Text> : null}
+          {current.proofPhotoUrl ? (
+            <Image
+              source={{ uri: current.proofPhotoUrl }}
+              style={styles.receipt}
+              resizeMode="cover"
+              accessibilityLabel="Photo taken by your collector"
+            />
+          ) : null}
+        </Card>
+      ) : null}
 
       {current.customerNote ? (
         <Card style={{ backgroundColor: colors.warningSoft, borderColor: colors.warning }}>
