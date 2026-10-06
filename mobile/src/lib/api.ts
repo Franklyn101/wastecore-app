@@ -95,6 +95,8 @@ export type NewOrder =
 
 export const api = {
   register: (body: { name: string; phone: string; password: string }) => post<AuthResponse>("/auth/register", body),
+  registerCollector: (body: { name: string; phone: string; password: string; area: string }) =>
+    post<AuthResponse>("/auth/register-collector", body),
   login: (body: { phone: string; password: string }) => post<AuthResponse>("/auth/login", body),
   me: () => request<{ user: User }>("/me"),
   updateProfile: (body: { name?: string; address?: string; email?: string }) => patch<{ user: User }>("/me", body),
@@ -148,6 +150,8 @@ export const api = {
     collectors: () => request<{ collectors: Collector[] }>("/admin/collectors"),
     setCollectorLogin: (id: string, password: string) =>
       request<{ collector: Collector }>(`/admin/collectors/${id}/login`, { method: "PUT", body: JSON.stringify({ password }) }),
+    approveCollector: (id: string) => post<{ collector: Collector }>(`/admin/collectors/${id}/approve`),
+    rejectCollector: (id: string) => post<{ ok: true }>(`/admin/collectors/${id}/reject`),
     removeCollectorLogin: (id: string) =>
       request<{ collector: Collector }>(`/admin/collectors/${id}/login`, { method: "DELETE" }),
     createCollector: (body: { name: string; phone: string; area: string }) =>
@@ -160,7 +164,10 @@ export const api = {
   },
 
   collector: {
-    me: () => request<{ collector: { id: string; name: string; phone: string; area: string } }>("/collector/me"),
+    me: () =>
+      request<{ collector: { id: string; name: string; phone: string; area: string; status: "PENDING" | "APPROVED" } }>(
+        "/collector/me",
+      ),
     jobs: () => request<CollectorJobs>("/collector/jobs"),
     job: (id: string) => request<{ job: CollectorJob }>(`/collector/jobs/${id}`),
     onTheWay: (id: string) => post<{ job: CollectorJob }>(`/collector/jobs/${id}/on-the-way`),

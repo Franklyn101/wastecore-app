@@ -1,4 +1,4 @@
-import type { Order, OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "./types"
+import type { Collector, Order, OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "./types"
 
 export function naira(amount: number): string {
   return `₦${amount.toLocaleString("en-NG")}`
@@ -95,3 +95,6 @@ export function pickupWhen(order: Pick<Order, "asap" | "scheduledDate">): string
   const days = daysUntil(order.scheduledDate)
   return `As soon as possible · ${days <= 0 ? "Today" : days === 1 ? "Tomorrow" : formatDate(order.scheduledDate)}`
 }
+
+/** Collectors that can be given jobs: active, and approved if they signed up themselves. */
+export const assignable = (c: Collector) => c.active && !c.pending

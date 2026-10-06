@@ -50,6 +50,9 @@ const collectorSchema = z.object({
   active: z.boolean().optional(),
 })
 
+/** Only active collectors that staff have approved can be given jobs. */
+const canTakeJobs = (c: { active: boolean; approvedAt: Date | null } | null) => Boolean(c?.active && c.approvedAt)
+
 const orderInclude = { collector: true, user: { select: { id: true, name: true, phone: true } } } as const
 
 async function findOrder(id: string | string[]) {
@@ -116,7 +119,7 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
     }
     if (body.collectorId) {
       const collector = await prisma.collector.findUnique({ where: { id: body.collectorId } })
-      if (!collector?.active) throw new HttpError(400, "Choose an active collector.")
+      if (!canTakeJobs(collector)) throw new HttpError(400, "Choose an active, approved collector.")
     }
     data.collectorId = body.collectorId
     // A new collector hasn't set off yet.
@@ -161,7 +164,7 @@ adminRouter.patch("/admin/subscriptions/:id", async (req, res) => {
   if (!sub) throw new HttpError(404, "Plan not found.")
   if (collectorId) {
     const collector = await prisma.collector.findUnique({ where: { id: collectorId } })
-    if (!collector?.active) throw new HttpError(400, "Choose an active collector.")
+    if (!canTakeJobs(collector)) throw new HttpError(400, "Choose an active, approved collector.")
   }
   const updated = await prisma.$transaction(async (tx) => {
     if (collectorId) {
@@ -180,12 +183,15 @@ adminRouter.patch("/admin/subscriptions/:id", async (req, res) => {
 })
 
 adminRouter.get("/admin/collectors", async (_req, res) => {
-  const collectors = await prisma.collector.findMany({ orderBy: [{ active: "desc" }, { name: "asc" }] })
+  const collectors = await prisma.collector.findMany({
+    // Sign-ups waiting for approval first, then active, then inactive.
+    orderBy: [{ approvedAt: { sort: "desc", nulls: "first" } }, { active: "desc" }, { name: "asc" }],
+  })
   res.json({ collectors: collectors.map(adminCollector) })
 })
 
 adminRouter.post("/admin/collectors", async (req, res) => {
-  const collector = await prisma.collector.create({ data: collectorSchema.parse(req.body) })
+  const collector = await prisma.collector.create({ data: { ...collectorSchema.parse(req.body), approvedAt: new Date() } })
   res.status(201).json({ collector: adminCollector(collector) })
 })
 
@@ -215,6 +221,32 @@ adminRouter.patch("/admin/collectors/:id", async (req, res) => {
     return tx.collector.update({ where: { id: existing.id }, data })
   })
   res.json({ collector: adminCollector(updated) })
+})
+
+adminRouter.post("/admin/collectors/:id/approve", async (req, res) => {
+  const collector = await findCollector(req.params.id)
+  const approved = await prisma.collector.update({
+    where: { id: collector.id },
+    data: { approvedAt: collector.approvedAt ?? new Date(), active: true },
+  })
+  res.json({ collector: adminCollector(approved) })
+})
+
+// Turns down a sign-up: removes the login, and the collector record too if it has no job history.
+adminRouter.post("/admin/collectors/:id/reject", async (req, res) => {
+  const collector = await findCollector(req.params.id)
+  if (collector.approvedAt) throw new HttpError(409, "This collector is already approved. Deactivate them instead.")
+  await prisma.$transaction(async (tx) => {
+    if (collector.userId) await tx.user.delete({ where: { id: collector.userId } })
+    const jobs = await tx.order.count({ where: { collectorId: collector.id } })
+    if (collector.selfRegistered && jobs === 0) {
+      await tx.collector.delete({ where: { id: collector.id } })
+    } else {
+      // Someone signed up with the number of a collector staff had added: drop the login, keep the record.
+      await tx.collector.update({ where: { id: collector.id }, data: { approvedAt: new Date() } })
+    }
+  })
+  res.json({ ok: true })
 })
 
 // Creates the collector's app login, or resets its password.

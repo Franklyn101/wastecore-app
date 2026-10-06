@@ -120,7 +120,16 @@ export type Catalog = {
 
 export type Customer = { id: string; name: string; phone: string }
 
-export type Collector = { id: string; name: string; phone: string; area: string; active: boolean; hasLogin: boolean }
+export type Collector = {
+  id: string
+  name: string
+  phone: string
+  area: string
+  active: boolean
+  /** Signed up in the app and waiting for staff approval. */
+  pending: boolean
+  hasLogin: boolean
+}
 
 export type AdminOrder = Order & { adminNote: string | null; customer: Customer; collector: Collector | null }
 

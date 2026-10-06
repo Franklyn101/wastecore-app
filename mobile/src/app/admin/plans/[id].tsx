@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 import { Linking, Text, View } from "react-native"
 import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Section } from "../../../components/ui"
 import { api } from "../../../lib/api"
-import { formatDate, naira, SUBSCRIPTION_STATUS } from "../../../lib/format"
+import { assignable, formatDate, naira, SUBSCRIPTION_STATUS } from "../../../lib/format"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
 import { font, spacing } from "../../../theme"
@@ -14,7 +14,7 @@ export default function AdminPlan() {
     const [{ subscriptions }, { collectors }] = await Promise.all([api.admin.subscriptions(), api.admin.collectors()])
     const sub = subscriptions.find((s) => s.id === id)
     if (!sub) throw new Error("Plan not found.")
-    return { sub, collectors: collectors.filter((c) => c.active) }
+    return { sub, collectors: collectors.filter(assignable) }
   })
   const [collectorId, setCollectorId] = useState<string | null>(null)
   const save = useSubmit()

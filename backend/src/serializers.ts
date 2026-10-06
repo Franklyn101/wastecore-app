@@ -33,7 +33,16 @@ export function customerOrder(order: Order) {
 }
 
 export function adminCollector(c: Collector) {
-  return { id: c.id, name: c.name, phone: c.phone, area: c.area, active: c.active, hasLogin: Boolean(c.userId) }
+  return {
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    area: c.area,
+    active: c.active,
+    // Signed up in the app and waiting for staff to approve them.
+    pending: !c.approvedAt,
+    hasLogin: Boolean(c.userId),
+  }
 }
 
 export function adminOrder(

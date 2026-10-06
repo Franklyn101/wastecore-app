@@ -25,6 +25,10 @@ const registerSchema = z.object({
   address: trimmed(300, "Address").optional(),
 })
 
+const registerCollectorSchema = registerSchema.omit({ address: true }).extend({
+  area: trimmed(100, "Area"),
+})
+
 const loginSchema = z.object({
   phone: z.string(),
   password: z.string(),
@@ -58,6 +62,33 @@ authRouter.post("/auth/register", authLimiter, async (req, res) => {
       address: body.address,
       passwordHash: await bcrypt.hash(body.password, BCRYPT_ROUNDS),
     },
+  })
+  res.status(201).json({ token: signToken(user), user: publicUser(user) })
+})
+
+// Collectors can sign themselves up; they see no jobs until staff approve them.
+authRouter.post("/auth/register-collector", authLimiter, async (req, res) => {
+  const body = registerCollectorSchema.parse(req.body)
+  if (await prisma.user.findUnique({ where: { phone: body.phone } })) {
+    throw new HttpError(409, "An account with this phone number already exists. Please sign in.")
+  }
+  const passwordHash = await bcrypt.hash(body.password, BCRYPT_ROUNDS)
+
+  const user = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: { name: body.name, phone: body.phone, passwordHash, role: "COLLECTOR" },
+    })
+    // If staff already added this collector (without a login), link to that record.
+    // The phone number isn't verified, so it still needs approval either way.
+    const existing = await tx.collector.findFirst({ where: { phone: body.phone, userId: null } })
+    if (existing) {
+      await tx.collector.update({ where: { id: existing.id }, data: { userId: user.id, approvedAt: null } })
+    } else {
+      await tx.collector.create({
+        data: { name: body.name, phone: body.phone, area: body.area, userId: user.id, selfRegistered: true },
+      })
+    }
+    return user
   })
   res.status(201).json({ token: signToken(user), user: publicUser(user) })
 })

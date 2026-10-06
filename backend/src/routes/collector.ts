@@ -1,6 +1,6 @@
 import { Router } from "express"
 import { z } from "zod"
-import { currentCollector, requireCollector, requireUser } from "../auth.ts"
+import { currentCollector, requireApprovedCollector, requireCollector, requireUser } from "../auth.ts"
 import { addDays, startOfLagosDay, today } from "../dates.ts"
 import { prisma } from "../db.ts"
 import type { Collector } from "../generated/prisma/client.ts"
@@ -11,6 +11,7 @@ import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
 // The collector app: a driver's own jobs, and what they record on each one.
 export const collectorRouter = Router()
 collectorRouter.use("/collector", requireUser, requireCollector)
+collectorRouter.use("/collector/jobs", requireApprovedCollector)
 
 const jobInclude = { user: { select: { name: true, phone: true } } } as const
 
@@ -34,7 +35,9 @@ async function close(id: string, collector: Collector, data: Parameters<typeof p
 
 collectorRouter.get("/collector/me", (req, res) => {
   const c = currentCollector(req)
-  res.json({ collector: { id: c.id, name: c.name, phone: c.phone, area: c.area } })
+  res.json({
+    collector: { id: c.id, name: c.name, phone: c.phone, area: c.area, status: c.approvedAt ? "APPROVED" : "PENDING" },
+  })
 })
 
 collectorRouter.get("/collector/jobs", async (req, res) => {

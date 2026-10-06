@@ -35,7 +35,7 @@ export default function SignIn() {
             </View>
             <Text style={font.title}>Welcome to WasteCore</Text>
             <Text style={[font.muted, { textAlign: "center" }]}>
-              Book pickups, manage your plan and order waste bags.
+              Book pickups, manage your plan and order waste bags. Collectors and staff sign in here too.
             </Text>
           </View>
 
@@ -65,6 +65,12 @@ export default function SignIn() {
             New to WasteCore?{" "}
             <Link href="/sign-up" style={{ color: colors.primary, fontWeight: "700" }}>
               Create an account
+            </Link>
+          </Text>
+          <Text style={[font.body, { textAlign: "center" }]}>
+            Want to collect waste with us?{" "}
+            <Link href={{ pathname: "/sign-up", params: { as: "collector" } }} style={{ color: colors.primary, fontWeight: "700" }}>
+              Apply as a collector
             </Link>
           </Text>
         </Screen>

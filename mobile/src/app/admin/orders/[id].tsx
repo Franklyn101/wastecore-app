@@ -4,7 +4,7 @@ import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
 import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api } from "../../../lib/api"
 import { confirmAction } from "../../../lib/dialogs"
-import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../../lib/format"
+import { assignable, formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../../lib/format"
 import type { AdminOrder, Collector } from "../../../lib/types"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
@@ -48,7 +48,7 @@ export default function ManageOrder() {
 
   const status = orderStatus(order)
   const isBags = order.type === "WASTE_BAGS"
-  const active = collectors.data?.collectors.filter((c) => c.active) ?? []
+  const active = collectors.data?.collectors.filter(assignable) ?? []
 
   function update(body: Update, after?: () => void) {
     void action.submit(async () => {

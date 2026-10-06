@@ -21,6 +21,7 @@ type AuthState = {
   loading: boolean
   signIn: (phone: string, password: string) => Promise<void>
   signUp: (name: string, phone: string, password: string) => Promise<void>
+  signUpCollector: (name: string, phone: string, password: string, area: string) => Promise<void>
   signOut: () => Promise<void>
   setUser: (user: User) => void
 }
@@ -68,6 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signIn: async (phone, password) => accept(await api.login({ phone, password })),
       signUp: async (name, phone, password) => accept(await api.register({ name, phone, password })),
+      signUpCollector: async (name, phone, password, area) =>
+        accept(await api.registerCollector({ name, phone, password, area })),
       signOut,
       setUser,
     }),

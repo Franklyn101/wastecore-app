@@ -145,3 +145,79 @@ describe("collector app", () => {
     expect(res.status).toBe(409)
   })
 })
+
+describe("collector self sign-up", () => {
+  const signUp = (body: object) =>
+    request(app)
+      .post("/auth/register-collector")
+      .send({ name: "Tunde Ade", phone: "07077778888", password: "tunde-pass-1", area: "Surulere", ...body })
+
+  async function staff(): Promise<Auth> {
+    const admin = await register("08099990000", "Staff")
+    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
+    return admin
+  }
+
+  it("waits for approval before showing any jobs", async () => {
+    const admin = await staff()
+    const res = await signUp({})
+    expect(res.status).toBe(201)
+    expect(res.body.user.role).toBe("COLLECTOR")
+    const tunde = { Authorization: `Bearer ${res.body.token}` }
+
+    const me = await request(app).get("/collector/me").set(tunde)
+    expect(me.body.collector).toMatchObject({ status: "PENDING", area: "Surulere" })
+    expect((await request(app).get("/collector/jobs").set(tunde)).status).toBe(403)
+
+    // Staff see the request first, and can't give a pending collector work.
+    const list = await request(app).get("/admin/collectors").set(admin)
+    expect(list.body.collectors[0]).toMatchObject({ name: "Tunde Ade", pending: true, hasLogin: true })
+    const id = list.body.collectors[0].id
+
+    const customer = await register("08012345678", "Ada")
+    const { body } = await request(app)
+      .post("/orders")
+      .set(customer)
+      .send({ type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Paper", asap: true })
+    await prisma.order.update({ where: { id: body.order.id }, data: { status: "PENDING" } })
+    expect((await request(app).patch(`/admin/orders/${body.order.id}`).set(admin).send({ collectorId: id })).status).toBe(400)
+
+    await request(app).post(`/admin/collectors/${id}/approve`).set(admin).expect(200)
+    expect((await request(app).get("/collector/me").set(tunde)).body.collector.status).toBe("APPROVED")
+    expect((await request(app).get("/collector/jobs").set(tunde)).status).toBe(200)
+    expect((await request(app).patch(`/admin/orders/${body.order.id}`).set(admin).send({ collectorId: id })).status).toBe(200)
+  })
+
+  it("lets staff reject a sign-up, removing the login", async () => {
+    const admin = await staff()
+    await signUp({})
+    const id = (await request(app).get("/admin/collectors").set(admin)).body.collectors[0].id
+    await request(app).post(`/admin/collectors/${id}/reject`).set(admin).expect(200)
+    expect((await request(app).get("/admin/collectors").set(admin)).body.collectors).toHaveLength(0)
+    expect((await login("07077778888", "tunde-pass-1")).status).toBe(401)
+  })
+
+  it("links to a collector staff already added, but still needs approval", async () => {
+    const admin = await staff()
+    const added = await request(app).post("/admin/collectors").set(admin).send({ name: "Tunde A.", phone: "07077778888", area: "Yaba" })
+    expect(added.body.collector.pending).toBe(false)
+
+    const res = await signUp({})
+    const tunde = { Authorization: `Bearer ${res.body.token}` }
+    const list = (await request(app).get("/admin/collectors").set(admin)).body.collectors
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({ id: added.body.collector.id, pending: true, hasLogin: true })
+    expect((await request(app).get("/collector/jobs").set(tunde)).status).toBe(403)
+
+    // Rejecting keeps the staff-added record (approved again) and drops the login.
+    await request(app).post(`/admin/collectors/${added.body.collector.id}/reject`).set(admin).expect(200)
+    const after = (await request(app).get("/admin/collectors").set(admin)).body.collectors
+    expect(after[0]).toMatchObject({ pending: false, hasLogin: false })
+  })
+
+  it("rejects phone numbers that already have an account", async () => {
+    await register("08012345678", "Ada")
+    expect((await signUp({ phone: "08012345678" })).status).toBe(409)
+    expect((await signUp({ area: "" })).status).toBe(400)
+  })
+})

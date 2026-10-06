@@ -58,6 +58,14 @@ export async function requireCollector(req: Request, _res: Response, next: NextF
   next()
 }
 
+/** Jobs are only for collectors staff have approved. */
+export function requireApprovedCollector(req: Request, _res: Response, next: NextFunction) {
+  if (!req.collector?.approvedAt) {
+    throw new HttpError(403, "Your collector account is waiting for approval by the WasteCore office.")
+  }
+  next()
+}
+
 export function currentCollector(req: Request): Collector {
   if (!req.collector) throw new HttpError(403, "Collectors only.")
   return req.collector

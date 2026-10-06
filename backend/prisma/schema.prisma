@@ -86,14 +86,17 @@ model User {
 }
 
 model Collector {
-  id        String   @id @default(cuid())
-  name      String
-  phone     String
-  area      String
-  active    Boolean  @default(true)
-  userId    String?  @unique // the collector's app login, if staff have given them one
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  name           String
+  phone          String
+  area           String
+  active         Boolean   @default(true)
+  userId         String?   @unique // the collector's app login
+  // Staff-added collectors are approved at once; self sign-ups wait for staff to approve them.
+  approvedAt     DateTime?
+  selfRegistered Boolean   @default(false) // created by the collector signing up in the app
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   orders        Order[]

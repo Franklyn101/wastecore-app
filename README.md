@@ -40,7 +40,14 @@ Admin accounts are created with `npm run db:create-admin` (see below). The serve
 
 ## Collector app
 
-Collectors (drivers) use the same app. Staff give a collector a login from **Collectors → (collector) → App login**: they set a password, and the collector signs in with their phone number. Deactivating a collector, or removing the login, stops them signing in.
+Collectors (drivers) use the same app. There are two ways to get them in:
+
+1. **Staff add them.** Staff set a password under **Collectors → (collector) → App login**. The collector signs in with their phone number and that password, and can start straight away.
+2. **They apply in the app.** On the sign-up screen they choose **Work as a collector** and enter their name, phone, password and the area they cover. They can sign in at once but see **Waiting for approval** until staff approve them. Staff see new applications at the top of the **Collectors** tab, with **Approve** and **Reject** buttons.
+
+Applicants never see jobs (customer names, numbers and addresses) before approval. If someone applies with the number of a collector staff already added, the login is linked to that record but still needs approval. Rejecting removes the login.
+
+Deactivating a collector, or removing their login, stops them signing in.
 
 | Screen | What the collector does |
 | --- | --- |
@@ -132,7 +139,8 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | Method | Path | Who | Purpose |
 | --- | --- | --- | --- |
 | POST | `/auth/register` | public | `{ name, phone, password }` → `{ token, user }` |
-| POST | `/auth/login` | public | `{ phone, password }` → `{ token, user }` |
+| POST | `/auth/register-collector` | public | `{ name, phone, password, area }`: applies as a collector (needs staff approval) |
+| POST | `/auth/login` | public | `{ phone, password }` → `{ token, user }` (customers, staff and collectors) |
 | GET / PATCH | `/me` | customer | Read or update name and default address |
 | GET | `/catalog` | public | Plans, prices, waste types, support categories, bank details |
 | POST | `/orders` | customer | Create an order (body depends on `type`, see `src/routes/orders.ts`) |
@@ -156,6 +164,8 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | PATCH | `/admin/orders/:id` | admin | `{ status?, collectorId?, adminNote?, customerNote? }`. Only valid status moves are accepted (see the lifecycle above). |
 | GET / POST / PATCH | `/admin/collectors` | admin | Manage collectors |
 | GET / PATCH | `/admin/support-tickets?status=` | admin | View and update tickets |
+| POST | `/admin/collectors/:id/approve` | admin | Approves a collector who applied in the app |
+| POST | `/admin/collectors/:id/reject` | admin | Turns down an application and removes its login |
 | PUT / DELETE | `/admin/collectors/:id/login` | admin | `{ password }` creates the collector's app login or resets its password; DELETE removes it |
 | GET | `/collector/jobs` | collector | Open jobs, the last 30 days of closed jobs, and done-today/this-week counts |
 | GET | `/collector/jobs/:id` | collector | One of the collector's jobs |
