@@ -4,11 +4,12 @@ export type User = {
   id: string
   name: string
   phone: string
+  email: string | null
   address: string | null
   role: "CUSTOMER" | "ADMIN"
 }
 
-export type OrderType = "INSTANT_PICKUP" | "WEEKLY_PICKUP" | "UPGRADE" | "WASTE_BAGS"
+export type OrderType = "INSTANT_PICKUP" | "PLAN_PICKUP" | "WASTE_BAGS"
 
 export type OrderStatus = "AWAITING_PAYMENT" | "PENDING" | "ASSIGNED" | "COMPLETED" | "INCOMPLETE" | "CANCELLED"
 
@@ -24,11 +25,49 @@ export type Order = {
   quantity: number
   amount: number
   status: OrderStatus
+  paymentMethod: "PAYSTACK" | "TRANSFER" | null
   receiptUrl: string | null
   customerNote: string | null
+  subscriptionId: string | null
   paidAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type SubscriptionStatus = "PENDING_PAYMENT" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "REPLACED"
+
+export type Subscription = {
+  id: string
+  plan: string
+  planName: string
+  planGroup: "weekly" | "premium"
+  pickupsPerWeek: number
+  price: number
+  periodLabel: string
+  status: SubscriptionStatus
+  address: string
+  wasteType: string
+  startDate: string
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
+  autoRenew: boolean
+  hasSavedCard: boolean
+  cardLabel: string | null
+  credit: number
+  replacesId: string | null
+  createdAt: string
+}
+
+export type PlanChangeQuote = { plan: string; credit: number; amountDue: number; allowed: boolean; message: string | null }
+
+export type Payment = {
+  reference: string
+  purpose: "ORDER" | "SUBSCRIPTION_START" | "SUBSCRIPTION_RENEWAL"
+  amount: number
+  status: "INITIALIZED" | "SUCCESS" | "FAILED"
+  orderId: string | null
+  subscriptionId: string | null
+  paidAt: string | null
 }
 
 export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED"
@@ -43,15 +82,26 @@ export type SupportTicket = {
   createdAt: string
 }
 
+export type Plan = {
+  id: string
+  group: "weekly" | "premium"
+  name: string
+  pickupsPerWeek: number
+  price: number
+  periodLabel: string
+  priceNote?: string
+  features: string[]
+}
+
 export type Catalog = {
   instantPickup: { id: string; name: string; description: string; price: number }
-  weeklyPlans: { id: string; name: string; pickupsPerWeek: number; price: number }[]
-  upgradePlans: { id: string; name: string; price: number; features: string[] }[]
+  plans: Plan[]
   bagSizes: { id: string; name: string; packSize: number; price: number }[]
   maxBagPacks: number
   wasteTypes: string[]
   supportCategories: string[]
   bank: { bankName: string; accountName: string; accountNumber: string }
+  onlinePayments: boolean
 }
 
 // Staff-only shapes from /admin endpoints.
@@ -62,6 +112,8 @@ export type Collector = { id: string; name: string; phone: string; area: string;
 
 export type AdminOrder = Order & { adminNote: string | null; customer: Customer; collector: Collector | null }
 
+export type AdminSubscription = Subscription & { customer: Customer; collector: Collector | null }
+
 export type AdminTicket = SupportTicket & { customer: Customer }
 
-export type AdminSummary = { orders: Record<OrderStatus, number>; openTickets: number }
+export type AdminSummary = { orders: Record<OrderStatus, number>; openTickets: number; activePlans: number }

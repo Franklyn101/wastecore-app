@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { createApp } from "../src/app.ts"
 import { prisma } from "../src/db.ts"
 import { normalizePhone, todayInLagos } from "../src/validation.ts"
+import { resetDatabase } from "./helpers.ts"
 
 const app = createApp()
 const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
@@ -16,10 +17,7 @@ async function register(phone = "08012345678", name = "Ada Obi") {
 }
 
 beforeEach(async () => {
-  await prisma.order.deleteMany()
-  await prisma.supportTicket.deleteMany()
-  await prisma.collector.deleteMany()
-  await prisma.user.deleteMany()
+  await resetDatabase()
 })
 
 afterAll(async () => {
@@ -120,8 +118,15 @@ describe("orders", () => {
     const badPlan = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "UPGRADE", plan: "gold", address: "Lekki", startDate: tomorrow })
+      .send({ type: "WASTE_BAGS", bagSize: "huge", quantity: 1, address: "Lekki" })
     expect(badPlan.status).toBe(400)
+
+    // Plans are subscriptions now, not one-off orders.
+    const plan = await request(app)
+      .post("/orders")
+      .set(auth)
+      .send({ type: "WEEKLY_PICKUP", plan: "weekly_2", address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
+    expect(plan.status).toBe(400)
   })
 
   it("never shows one customer another customer's orders", async () => {
@@ -130,8 +135,8 @@ describe("orders", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(ada)
-      .send({ type: "WEEKLY_PICKUP", plan: "weekly_2", address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
-    expect(body.order.amount).toBe(2500)
+      .send({ type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
+    expect(body.order.amount).toBe(2000)
 
     expect((await request(app).get(`/orders/${body.order.id}`).set(bayo)).status).toBe(404)
     expect((await request(app).post(`/orders/${body.order.id}/cancel`).set(bayo)).status).toBe(404)

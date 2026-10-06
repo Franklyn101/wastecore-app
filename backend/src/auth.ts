@@ -49,5 +49,5 @@ export function currentUser(req: Request): User {
 }
 
 export function publicUser(user: User) {
-  return { id: user.id, name: user.name, phone: user.phone, address: user.address, role: user.role }
+  return { id: user.id, name: user.name, phone: user.phone, email: user.email, address: user.address, role: user.role }
 }

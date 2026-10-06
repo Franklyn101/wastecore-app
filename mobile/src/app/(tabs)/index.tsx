@@ -3,11 +3,11 @@ import { router, type Href } from "expo-router"
 import type { ComponentProps } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 import { OrderCard } from "../../components/OrderCard"
-import { ErrorBanner, Screen, Section } from "../../components/ui"
+import { Badge, Button, Card, ErrorBanner, Row, Screen, Section } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
-import { isActive, naira } from "../../lib/format"
+import { formatDate, isActive, naira } from "../../lib/format"
 import { useFocusData } from "../../lib/useFocusData"
 import { colors, font, radius, spacing } from "../../theme"
 
@@ -21,11 +21,19 @@ type Service = {
 export default function Home() {
   const { user } = useAuth()
   const { catalog, error: catalogError, reload } = useCatalog()
-  const { data, error, refreshing, refresh } = useFocusData(() => api.orders())
+  const { data, error, refreshing, refresh } = useFocusData(async () => {
+    const [{ orders }, { subscriptions }] = await Promise.all([api.orders(), api.subscriptions()])
+    const plan = subscriptions.find((s) => s.status === "ACTIVE") ?? null
+    const nextPickup = plan ? ((await api.subscription(plan.id)).upcomingPickups[0] ?? null) : null
+    return { orders, plan, nextPickup }
+  })
   const active = data?.orders.filter((o) => isActive(o.status)) ?? []
+  const plan = data?.plan ?? null
 
-  const cheapestWeekly = catalog ? Math.min(...catalog.weeklyPlans.map((p) => p.price)) : null
-  const cheapestUpgrade = catalog ? Math.min(...catalog.upgradePlans.map((p) => p.price)) : null
+  const weekly = catalog?.plans.filter((p) => p.group === "weekly") ?? []
+  const premium = catalog?.plans.filter((p) => p.group === "premium") ?? []
+  const cheapestWeekly = weekly.length ? Math.min(...weekly.map((p) => p.price / 4)) : null
+  const cheapestPremium = premium.length ? Math.min(...premium.map((p) => p.price)) : null
   const cheapestBags = catalog ? Math.min(...catalog.bagSizes.map((b) => b.price)) : null
 
   // The same five services as the WhatsApp bot's main menu.
@@ -34,19 +42,19 @@ export default function Home() {
       title: "Instant pickup",
       subtitle: catalog ? naira(catalog.instantPickup.price) : "One-off pickup",
       icon: "flash-outline",
-      href: { pathname: "/book/pickup", params: { mode: "instant" } },
+      href: "/book/pickup",
     },
     {
-      title: "Weekly pickup",
+      title: "Weekly plans",
       subtitle: cheapestWeekly ? `From ${naira(cheapestWeekly)}/week` : "Regular pickups",
       icon: "calendar-outline",
-      href: { pathname: "/book/pickup", params: { mode: "weekly" } },
+      href: plan ? "/plan" : "/book/plans",
     },
     {
-      title: "Upgrade plan",
-      subtitle: cheapestUpgrade ? `From ${naira(cheapestUpgrade)}/month` : "Monthly plans",
+      title: plan ? "Upgrade plan" : "Premium plans",
+      subtitle: cheapestPremium ? `From ${naira(cheapestPremium)}/month` : "Monthly plans",
       icon: "star-outline",
-      href: "/book/upgrade",
+      href: plan ? { pathname: "/book/plans", params: { change: plan.id, current: plan.plan } } : "/book/plans",
     },
     {
       title: "Waste bags",
@@ -71,6 +79,20 @@ export default function Home() {
 
       {catalogError ? <ErrorBanner message={catalogError} onRetry={reload} /> : null}
       {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
+
+      {plan ? (
+        <Card>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={font.heading}>{plan.planName}</Text>
+            <Badge label="Active" tone="success" />
+          </View>
+          {data?.nextPickup ? <Row label="Next pickup" value={formatDate(data.nextPickup.scheduledDate)} /> : null}
+          {plan.currentPeriodEnd ? (
+            <Row label={plan.autoRenew ? "Renews on" : "Ends on"} value={formatDate(plan.currentPeriodEnd)} />
+          ) : null}
+          <Button title="Manage plan" variant="secondary" onPress={() => router.push("/plan")} />
+        </Card>
+      ) : null}
 
       {active.length > 0 ? (
         <Section title="Active requests">

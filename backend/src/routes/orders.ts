@@ -2,16 +2,7 @@ import { Router } from "express"
 import multer from "multer"
 import { z } from "zod"
 import { currentUser, requireUser } from "../auth.ts"
-import {
-  BAG_SIZES,
-  bagSizeIds,
-  INSTANT_PICKUP,
-  MAX_BAG_PACKS,
-  UPGRADE_PLANS,
-  upgradePlanIds,
-  WEEKLY_PLANS,
-  weeklyPlanIds,
-} from "../catalog.ts"
+import { BAG_SIZES, bagSizeIds, INSTANT_PICKUP, MAX_BAG_PACKS } from "../catalog.ts"
 import { prisma } from "../db.ts"
 import type { OrderType } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
@@ -23,22 +14,9 @@ import { futureDateSchema, todayInLagos, trimmed } from "../validation.ts"
 const address = trimmed(300, "Address")
 const wasteType = trimmed(100, "Waste type")
 
-// One schema per service, mirroring the WhatsApp bot's flows.
+// One-off services. Weekly and premium plans are subscriptions (routes/subscriptions.ts).
 const createOrderSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("INSTANT_PICKUP"), address, wasteType, pickupDate: futureDateSchema }),
-  z.object({
-    type: z.literal("WEEKLY_PICKUP"),
-    plan: z.enum(weeklyPlanIds, "Choose a weekly plan."),
-    address,
-    wasteType,
-    pickupDate: futureDateSchema,
-  }),
-  z.object({
-    type: z.literal("UPGRADE"),
-    plan: z.enum(upgradePlanIds, "Choose an upgrade plan."),
-    address,
-    startDate: futureDateSchema,
-  }),
   z.object({
     type: z.literal("WASTE_BAGS"),
     bagSize: z.enum(bagSizeIds, "Choose a bag size."),
@@ -55,48 +33,25 @@ type CreateOrder = z.infer<typeof createOrderSchema>
 
 /** Prices the order from the catalog. The client never sends an amount. */
 function orderData(body: CreateOrder) {
-  const find = <T extends { id: string }>(list: readonly T[], id: string) => list.find((x) => x.id === id)!
-  switch (body.type) {
-    case "INSTANT_PICKUP":
-      return {
-        type: body.type as OrderType,
-        plan: INSTANT_PICKUP.id,
-        address: body.address,
-        wasteType: body.wasteType,
-        scheduledDate: body.pickupDate,
-        quantity: 1,
-        amount: INSTANT_PICKUP.price,
-      }
-    case "WEEKLY_PICKUP":
-      return {
-        type: body.type as OrderType,
-        plan: body.plan,
-        address: body.address,
-        wasteType: body.wasteType,
-        scheduledDate: body.pickupDate,
-        quantity: 1,
-        amount: find(WEEKLY_PLANS, body.plan).price,
-      }
-    case "UPGRADE":
-      return {
-        type: body.type as OrderType,
-        plan: body.plan,
-        address: body.address,
-        wasteType: null,
-        scheduledDate: body.startDate,
-        quantity: 1,
-        amount: find(UPGRADE_PLANS, body.plan).price,
-      }
-    case "WASTE_BAGS":
-      return {
-        type: body.type as OrderType,
-        plan: body.bagSize,
-        address: body.address,
-        wasteType: null,
-        scheduledDate: todayInLagos(),
-        quantity: body.quantity,
-        amount: find(BAG_SIZES, body.bagSize).price * body.quantity,
-      }
+  if (body.type === "INSTANT_PICKUP") {
+    return {
+      type: body.type as OrderType,
+      plan: INSTANT_PICKUP.id,
+      address: body.address,
+      wasteType: body.wasteType,
+      scheduledDate: body.pickupDate,
+      quantity: 1,
+      amount: INSTANT_PICKUP.price,
+    }
+  }
+  return {
+    type: body.type as OrderType,
+    plan: body.bagSize,
+    address: body.address,
+    wasteType: null,
+    scheduledDate: todayInLagos(),
+    quantity: body.quantity,
+    amount: BAG_SIZES.find((b) => b.id === body.bagSize)!.price * body.quantity,
   }
 }
 
@@ -143,8 +98,9 @@ ordersRouter.post("/orders", async (req, res) => {
 })
 
 ordersRouter.get("/orders", async (req, res) => {
+  // Plan pickups are listed under the plan (GET /subscriptions/:id), not here.
   const orders = await prisma.order.findMany({
-    where: { userId: currentUser(req).id },
+    where: { userId: currentUser(req).id, type: { not: "PLAN_PICKUP" } },
     orderBy: { createdAt: "desc" },
     take: 100,
   })
@@ -158,7 +114,9 @@ ordersRouter.get("/orders/:id", async (req, res) => {
 // Upload (or replace) the bank-transfer receipt. Moves the order to PENDING for an admin to verify.
 ordersRouter.post("/orders/:id/receipt", upload.single("receipt"), async (req, res) => {
   const order = await findOwnOrder(req.params.id, currentUser(req).id)
-  if (order.status !== "AWAITING_PAYMENT" && order.status !== "PENDING") {
+  const canTakeReceipt =
+    order.status === "AWAITING_PAYMENT" || (order.status === "PENDING" && order.paymentMethod === "TRANSFER")
+  if (!canTakeReceipt) {
     throw new HttpError(409, "This order can no longer take a receipt.")
   }
   if (!req.file) throw new HttpError(400, "Attach a photo of your payment receipt.")
@@ -167,8 +125,8 @@ ordersRouter.post("/orders/:id/receipt", upload.single("receipt"), async (req, r
   const receiptUrl = await saveReceipt(req.file, order.reference)
   // Conditional update so a concurrent cancel or admin change wins cleanly.
   const updated = await prisma.order.updateMany({
-    where: { id: order.id, status: { in: ["AWAITING_PAYMENT", "PENDING"] } },
-    data: { receiptUrl, status: "PENDING", paidAt: new Date(), customerNote: null },
+    where: { id: order.id, status: order.status },
+    data: { receiptUrl, status: "PENDING", paymentMethod: "TRANSFER", paidAt: new Date(), customerNote: null },
   })
   if (updated.count === 0) throw new HttpError(409, "This order can no longer take a receipt.")
   res.json({ order: customerOrder(await findOwnOrder(order.id, order.userId)) })

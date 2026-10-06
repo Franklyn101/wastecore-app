@@ -1,12 +1,12 @@
 import { router } from "expo-router"
 import { Pressable, Text, View } from "react-native"
-import { formatDate, naira, ORDER_STATUS, ORDER_TYPE_LABELS } from "../lib/format"
+import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus } from "../lib/format"
 import type { Order } from "../lib/types"
 import { colors, font, radius, spacing } from "../theme"
 import { Badge } from "./ui"
 
 export function OrderCard({ order }: { order: Order }) {
-  const status = ORDER_STATUS[order.status]
+  const status = orderStatus(order)
   const what = order.type === "WASTE_BAGS" ? `${order.planLabel} bags × ${order.quantity}` : order.planLabel
   return (
     <Pressable
@@ -32,7 +32,9 @@ export function OrderCard({ order }: { order: Order }) {
         <Text style={font.muted}>
           {order.reference} · {formatDate(order.scheduledDate)}
         </Text>
-        <Text style={[font.label, { color: colors.primary }]}>{naira(order.amount)}</Text>
+        <Text style={[font.label, { color: colors.primary }]}>
+          {order.type === "PLAN_PICKUP" ? "Plan" : naira(order.amount)}
+        </Text>
       </View>
     </Pressable>
   )

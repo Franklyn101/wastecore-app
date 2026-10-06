@@ -1,22 +1,19 @@
-import { router, Stack, useLocalSearchParams } from "expo-router"
+import { router } from "expo-router"
 import { useState } from "react"
 import { Text, View } from "react-native"
 import { DatePicker } from "../../components/DatePicker"
-import { Button, Chip, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
-import { api, type NewOrder } from "../../lib/api"
+import { Button, Chip, ErrorBanner, Loading, Screen, TextField } from "../../components/ui"
+import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
 import { naira } from "../../lib/format"
 import { useSubmit } from "../../lib/useSubmit"
 import { font, spacing } from "../../theme"
 
-// Instant and weekly pickups share the bot's flow: (plan) -> address -> waste type -> date -> pay.
+// The bot's instant pickup flow: address -> waste type -> date -> pay.
 export default function BookPickup() {
-  const { mode } = useLocalSearchParams<{ mode?: string }>()
-  const weekly = mode === "weekly"
   const { user } = useAuth()
   const { catalog, error: catalogError, reload } = useCatalog()
-  const [plan, setPlan] = useState<string | null>(null)
   const [address, setAddress] = useState(user?.address ?? "")
   const [wasteType, setWasteType] = useState<string | null>(null)
   const [otherWaste, setOtherWaste] = useState("")
@@ -26,40 +23,24 @@ export default function BookPickup() {
   if (!catalog) return catalogError ? <ErrorBanner message={catalogError} onRetry={reload} /> : <Loading />
 
   const waste = wasteType === "Other" ? otherWaste.trim() : wasteType
-  const price = weekly ? catalog.weeklyPlans.find((p) => p.id === plan)?.price : catalog.instantPickup.price
-  const ready = (!weekly || plan) && address.trim() && waste && date
+  const ready = address.trim() && waste && date
 
   function book() {
     if (!ready) return
-    const base = { address: address.trim(), wasteType: waste!, pickupDate: date! }
-    const body: NewOrder = weekly
-      ? { type: "WEEKLY_PICKUP", plan: plan!, ...base }
-      : { type: "INSTANT_PICKUP", ...base }
     void submit(async () => {
-      const { order } = await api.createOrder(body)
+      const { order } = await api.createOrder({
+        type: "INSTANT_PICKUP",
+        address: address.trim(),
+        wasteType: waste!,
+        pickupDate: date!,
+      })
       router.replace(`/orders/${order.id}`)
     })
   }
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: weekly ? "Weekly pickup" : "Instant pickup" }} />
-
-      {weekly ? (
-        <Section title="Choose your plan">
-          {catalog.weeklyPlans.map((p) => (
-            <OptionCard
-              key={p.id}
-              title={p.name}
-              trailing={`${naira(p.price)}/wk`}
-              selected={plan === p.id}
-              onPress={() => setPlan(p.id)}
-            />
-          ))}
-        </Section>
-      ) : (
-        <Text style={font.muted}>{catalog.instantPickup.description}</Text>
-      )}
+      <Text style={font.muted}>{catalog.instantPickup.description}</Text>
 
       <TextField
         label="Pickup address"
@@ -82,15 +63,16 @@ export default function BookPickup() {
         ) : null}
       </View>
 
-      <DatePicker label={weekly ? "First pickup date" : "Pickup date"} value={date} onChange={setDate} />
+      <DatePicker label="Pickup date" value={date} onChange={setDate} />
 
       {error ? <ErrorBanner message={error} /> : null}
       <Button
-        title={price ? `Continue to payment · ${naira(price)}` : "Continue to payment"}
+        title={`Continue to payment · ${naira(catalog.instantPickup.price)}`}
         onPress={book}
         loading={busy}
         disabled={!ready}
       />
+      <Text style={font.muted}>Need regular pickups? A plan works out cheaper.</Text>
     </Screen>
   )
 }

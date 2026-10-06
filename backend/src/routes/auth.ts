@@ -31,6 +31,7 @@ const loginSchema = z.object({
 
 const updateProfileSchema = z.object({
   name: trimmed(100, "Name").optional(),
+  email: z.email("Enter a valid email address.").max(200).toLowerCase().optional(),
   address: trimmed(300, "Address").optional(),
 })
 

@@ -1,5 +1,5 @@
-import { planLabel } from "./catalog.ts"
-import type { Collector, Order, SupportTicket } from "./generated/prisma/client.ts"
+import { findPlan, planLabel } from "./catalog.ts"
+import type { Collector, Order, Subscription, SupportTicket } from "./generated/prisma/client.ts"
 
 const dateOnly = (date: Date) => date.toISOString().slice(0, 10)
 
@@ -17,8 +17,10 @@ export function customerOrder(order: Order) {
     quantity: order.quantity,
     amount: order.amount,
     status: order.status,
+    paymentMethod: order.paymentMethod,
     receiptUrl: order.receiptUrl,
     customerNote: order.customerNote,
+    subscriptionId: order.subscriptionId,
     paidAt: order.paidAt,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
@@ -34,6 +36,38 @@ export function adminOrder(
     customer: order.user,
     collector: order.collector,
   }
+}
+
+/** A subscription as the customer sees it. The saved card's token never leaves the server. */
+export function subscription(s: Subscription) {
+  const plan = findPlan(s.plan)
+  return {
+    id: s.id,
+    plan: s.plan,
+    planName: plan.name,
+    planGroup: plan.group,
+    pickupsPerWeek: plan.pickupsPerWeek,
+    price: plan.price,
+    periodLabel: plan.periodLabel,
+    status: s.status,
+    address: s.address,
+    wasteType: s.wasteType,
+    startDate: dateOnly(s.startDate),
+    currentPeriodStart: s.currentPeriodStart ? dateOnly(s.currentPeriodStart) : null,
+    currentPeriodEnd: s.currentPeriodEnd ? dateOnly(s.currentPeriodEnd) : null,
+    autoRenew: s.autoRenew,
+    hasSavedCard: Boolean(s.authorizationCode),
+    cardLabel: s.cardLabel,
+    credit: s.credit,
+    replacesId: s.replacesId,
+    createdAt: s.createdAt,
+  }
+}
+
+export function adminSubscription(
+  s: Subscription & { collector: Collector | null; user: { id: string; name: string; phone: string } },
+) {
+  return { ...subscription(s), customer: s.user, collector: s.collector }
 }
 
 export function ticket(t: SupportTicket) {

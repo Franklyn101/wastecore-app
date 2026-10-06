@@ -9,7 +9,7 @@ import { font, spacing } from "../../../theme"
 
 // The queue staff work through, most urgent first.
 const FILTERS: { status: OrderStatus | null; label: string }[] = [
-  { status: "PENDING", label: "To review" },
+  { status: "PENDING", label: "To do" },
   { status: "ASSIGNED", label: "Assigned" },
   { status: "AWAITING_PAYMENT", label: "Unpaid" },
   { status: "COMPLETED", label: "Completed" },
@@ -19,7 +19,7 @@ const FILTERS: { status: OrderStatus | null; label: string }[] = [
 ]
 
 const EMPTY: Record<string, string> = {
-  PENDING: "No receipts waiting for review.",
+  PENDING: "Nothing to do. New paid orders and plan pickups needing a collector appear here.",
   ASSIGNED: "No orders with a collector right now.",
   AWAITING_PAYMENT: "No unpaid orders.",
 }

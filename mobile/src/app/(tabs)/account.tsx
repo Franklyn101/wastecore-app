@@ -10,18 +10,24 @@ export default function Account() {
   const { user, setUser, signOut } = useAuth()
   const [name, setName] = useState(user?.name ?? "")
   const [address, setAddress] = useState(user?.address ?? "")
+  const [email, setEmail] = useState(user?.email ?? "")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
-  const changed = name.trim() !== user?.name || address.trim() !== (user?.address ?? "")
+  const changed =
+    name.trim() !== user?.name || address.trim() !== (user?.address ?? "") || email.trim() !== (user?.email ?? "")
 
   async function save() {
     setBusy(true)
     setError(null)
     setSaved(false)
     try {
-      const res = await api.updateProfile({ name: name.trim(), ...(address.trim() ? { address: address.trim() } : {}) })
+      const res = await api.updateProfile({
+        name: name.trim(),
+        ...(address.trim() ? { address: address.trim() } : {}),
+        ...(email.trim() ? { email: email.trim() } : {}),
+      })
       setUser(res.user)
       setSaved(true)
     } catch (e) {
@@ -42,6 +48,15 @@ export default function Account() {
       </Card>
       {error ? <ErrorBanner message={error} /> : null}
       <TextField label="Full name" value={name} onChangeText={setName} autoComplete="name" />
+      <TextField
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoComplete="email"
+        hint="Payment receipts from Paystack are sent here."
+      />
       <TextField
         label="Default pickup address"
         value={address}

@@ -1,12 +1,16 @@
 import { Platform } from "react-native"
 import type {
   AdminOrder,
+  AdminSubscription,
   AdminSummary,
   AdminTicket,
   Catalog,
   Collector,
   Order,
   OrderStatus,
+  Payment,
+  PlanChangeQuote,
+  Subscription,
   SupportTicket,
   TicketStatus,
   User,
@@ -71,15 +75,13 @@ export type AuthResponse = { token: string; user: User }
 
 export type NewOrder =
   | { type: "INSTANT_PICKUP"; address: string; wasteType: string; pickupDate: string }
-  | { type: "WEEKLY_PICKUP"; plan: string; address: string; wasteType: string; pickupDate: string }
-  | { type: "UPGRADE"; plan: string; address: string; startDate: string }
   | { type: "WASTE_BAGS"; bagSize: string; quantity: number; address: string }
 
 export const api = {
   register: (body: { name: string; phone: string; password: string }) => post<AuthResponse>("/auth/register", body),
   login: (body: { phone: string; password: string }) => post<AuthResponse>("/auth/login", body),
   me: () => request<{ user: User }>("/me"),
-  updateProfile: (body: { name?: string; address?: string }) => patch<{ user: User }>("/me", body),
+  updateProfile: (body: { name?: string; address?: string; email?: string }) => patch<{ user: User }>("/me", body),
 
   catalog: () => request<Catalog>("/catalog"),
 
@@ -100,6 +102,23 @@ export const api = {
     return request<{ order: Order }>(`/orders/${id}/receipt`, { method: "POST", body: form })
   },
 
+  subscriptions: () => request<{ subscriptions: Subscription[]; renewWindowDays: number }>("/subscriptions"),
+  subscription: (id: string) =>
+    request<{ subscription: Subscription; upcomingPickups: Order[] }>(`/subscriptions/${id}`),
+  subscribe: (body: { plan: string; address: string; wasteType: string; startDate: string }) =>
+    post<{ subscription: Subscription }>("/subscriptions", body),
+  changeQuote: (id: string, plan: string) =>
+    request<{ quote: PlanChangeQuote }>(`/subscriptions/${id}/change-quote${query({ plan })}`),
+  changePlan: (id: string, plan: string) =>
+    post<{ subscription: Subscription; quote: PlanChangeQuote }>(`/subscriptions/${id}/change`, { plan }),
+  setAutoRenew: (id: string, autoRenew: boolean) =>
+    patch<{ subscription: Subscription }>(`/subscriptions/${id}`, { autoRenew }),
+  cancelSubscription: (id: string) => post<{ ok: true }>(`/subscriptions/${id}/cancel`),
+
+  startPayment: (body: { orderId?: string; subscriptionId?: string; email?: string; returnUrl?: string }) =>
+    post<{ payment: Payment; authorizationUrl: string }>("/payments", body),
+  payment: (reference: string) => request<{ payment: Payment }>(`/payments/${encodeURIComponent(reference)}`),
+
   createTicket: (body: { category: string; message: string; contactTime: string }) =>
     post<{ ticket: SupportTicket }>("/support-tickets", body),
   tickets: () => request<{ tickets: SupportTicket[] }>("/support-tickets"),
@@ -113,6 +132,9 @@ export const api = {
       id: string,
       body: { status?: OrderStatus; collectorId?: string | null; adminNote?: string | null; customerNote?: string | null },
     ) => patch<{ order: AdminOrder }>(`/admin/orders/${id}`, body),
+    subscriptions: () => request<{ subscriptions: AdminSubscription[] }>("/admin/subscriptions"),
+    setPlanCollector: (id: string, collectorId: string | null) =>
+      patch<{ subscription: AdminSubscription }>(`/admin/subscriptions/${id}`, { collectorId }),
     collectors: () => request<{ collectors: Collector[] }>("/admin/collectors"),
     createCollector: (body: { name: string; phone: string; area: string }) =>
       post<{ collector: Collector }>("/admin/collectors", body),

@@ -4,7 +4,7 @@ import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
 import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api } from "../../../lib/api"
 import { confirmAction } from "../../../lib/dialogs"
-import { formatDate, naira, ORDER_STATUS, ORDER_TYPE_LABELS } from "../../../lib/format"
+import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus } from "../../../lib/format"
 import type { AdminOrder, Collector } from "../../../lib/types"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
@@ -46,9 +46,8 @@ export default function ManageOrder() {
 
   if (!order) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
 
-  const status = ORDER_STATUS[order.status]
+  const status = orderStatus(order)
   const isBags = order.type === "WASTE_BAGS"
-  const isUpgrade = order.type === "UPGRADE"
   const active = collectors.data?.collectors.filter((c) => c.active) ?? []
 
   function update(body: Update, after?: () => void) {
@@ -58,7 +57,7 @@ export default function ManageOrder() {
     })
   }
 
-  const done = isBags ? "Mark delivered" : isUpgrade ? "Mark plan activated" : "Mark completed"
+  const done = isBags ? "Mark delivered" : "Mark completed"
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
@@ -90,8 +89,20 @@ export default function ManageOrder() {
         update={update}
       />
 
-      <Section title="Payment receipt">
-        {order.receiptUrl ? (
+      <Section title="Payment">
+        {order.type === "PLAN_PICKUP" ? (
+          <Card>
+            <Text style={font.muted}>Included in the customer's {order.planLabel} plan, paid online.</Text>
+          </Card>
+        ) : order.paymentMethod === "PAYSTACK" ? (
+          <Card>
+            <Text style={font.label}>Paid online with Paystack</Text>
+            <Text style={font.muted}>
+              {naira(order.amount)} verified{order.paidAt ? ` on ${formatDateTime(order.paidAt)}` : ""}. No receipt check
+              needed.
+            </Text>
+          </Card>
+        ) : order.receiptUrl ? (
           <Pressable
             accessibilityRole="imagebutton"
             accessibilityLabel="Open receipt full size"
@@ -136,11 +147,11 @@ export default function ManageOrder() {
           {isBags ? <Row label="Packs" value={String(order.quantity)} /> : null}
           {order.wasteType ? <Row label="Waste type" value={order.wasteType} /> : null}
           <Row
-            label={isUpgrade ? "Start date" : isBags ? "Ordered" : "Pickup date"}
+            label={isBags ? "Ordered" : "Pickup date"}
             value={formatDate(order.scheduledDate)}
           />
           <Row label={isBags ? "Deliver to" : "Address"} value={order.address} />
-          <Row label="Amount due" value={naira(order.amount)} />
+          <Row label="Amount" value={order.type === "PLAN_PICKUP" ? "Included in plan" : naira(order.amount)} />
           {order.collector ? <Row label="Collector" value={`${order.collector.name} (${order.collector.area})`} /> : null}
           {order.customerNote ? <Row label="Message to customer" value={order.customerNote} /> : null}
         </Card>
@@ -253,6 +264,22 @@ function NextStep(p: NextStepProps) {
       )
 
     case "PENDING":
+      // Paid online (or part of a paid plan): nothing to verify, just schedule it.
+      if (order.paymentMethod === "PAYSTACK") {
+        return (
+          <Card style={{ borderColor: colors.primary }}>
+            <Text style={font.heading}>{order.type === "PLAN_PICKUP" ? "Plan pickup to schedule" : "Paid · ready to schedule"}</Text>
+            <Text style={font.muted}>Due {formatDate(order.scheduledDate)}.</Text>
+            {collectorPicker}
+            <Button
+              title="Assign collector"
+              loading={busy}
+              disabled={!p.collectorId}
+              onPress={() => update({ collectorId: p.collectorId })}
+            />
+          </Card>
+        )
+      }
       if (p.rejecting) {
         return (
           <Card>
@@ -289,23 +316,13 @@ function NextStep(p: NextStepProps) {
             Confirm {naira(order.amount)} arrived in the account (reference {order.reference}) and matches the receipt
             below.
           </Text>
-          {order.type === "UPGRADE" ? (
-            <Button
-              title="Confirm payment & activate plan"
-              loading={busy}
-              onPress={() => update({ status: "COMPLETED", customerNote: null })}
-            />
-          ) : (
-            <>
-              {collectorPicker}
-              <Button
-                title="Confirm payment & assign"
-                loading={busy}
-                disabled={!p.collectorId}
-                onPress={() => update({ collectorId: p.collectorId, customerNote: null })}
-              />
-            </>
-          )}
+          {collectorPicker}
+          <Button
+            title="Confirm payment & assign"
+            loading={busy}
+            disabled={!p.collectorId}
+            onPress={() => update({ collectorId: p.collectorId, customerNote: null })}
+          />
           <Button title="Reject receipt" variant="danger" disabled={busy} onPress={() => p.setRejecting(true)} />
         </Card>
       )

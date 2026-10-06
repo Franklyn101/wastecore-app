@@ -1,4 +1,4 @@
-import type { OrderStatus, OrderType, TicketStatus } from "./types"
+import type { Order, OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "./types"
 
 export function naira(amount: number): string {
   return `₦${amount.toLocaleString("en-NG")}`
@@ -25,18 +25,40 @@ export function upcomingDates(count: number): string[] {
 
 export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   INSTANT_PICKUP: "Instant pickup",
-  WEEKLY_PICKUP: "Weekly pickup",
-  UPGRADE: "Plan upgrade",
+  PLAN_PICKUP: "Plan pickup",
   WASTE_BAGS: "Waste bags",
 }
 
-export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: "warning" | "info" | "success" | "danger" | "muted" }> = {
+type Tone = "warning" | "info" | "success" | "danger" | "muted"
+
+export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: Tone }> = {
   AWAITING_PAYMENT: { label: "Awaiting payment", tone: "warning" },
   PENDING: { label: "Confirming payment", tone: "info" },
   ASSIGNED: { label: "Collector assigned", tone: "info" },
   COMPLETED: { label: "Completed", tone: "success" },
   INCOMPLETE: { label: "Incomplete", tone: "danger" },
   CANCELLED: { label: "Cancelled", tone: "muted" },
+}
+
+/** Status for display. An order paid online is already confirmed, so it reads differently. */
+export function orderStatus(order: Pick<Order, "status" | "paymentMethod" | "type">): { label: string; tone: Tone } {
+  if (order.status === "PENDING" && order.type === "PLAN_PICKUP") return { label: "Scheduled", tone: "info" }
+  if (order.status === "PENDING" && order.paymentMethod === "PAYSTACK") return { label: "Paid · scheduling", tone: "info" }
+  return ORDER_STATUS[order.status]
+}
+
+export const SUBSCRIPTION_STATUS: Record<SubscriptionStatus, { label: string; tone: Tone }> = {
+  PENDING_PAYMENT: { label: "Awaiting payment", tone: "warning" },
+  ACTIVE: { label: "Active", tone: "success" },
+  EXPIRED: { label: "Expired", tone: "danger" },
+  CANCELLED: { label: "Cancelled", tone: "muted" },
+  REPLACED: { label: "Replaced", tone: "muted" },
+}
+
+/** Whole days from today (Lagos) until an ISO date. */
+export function daysUntil(isoDate: string): number {
+  const [today] = upcomingDates(1)
+  return Math.round((Date.parse(isoDate.slice(0, 10)) - Date.parse(today)) / 86_400_000)
 }
 
 export const TICKET_STATUS: Record<TicketStatus, { label: string; tone: "warning" | "info" | "success" }> = {

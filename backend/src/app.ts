@@ -6,6 +6,8 @@ import { adminRouter } from "./routes/admin.ts"
 import { authRouter } from "./routes/auth.ts"
 import { catalogRouter } from "./routes/catalog.ts"
 import { ordersRouter } from "./routes/orders.ts"
+import { paymentsRouter, paystackWebhook } from "./routes/payments.ts"
+import { subscriptionsRouter } from "./routes/subscriptions.ts"
 import { supportRouter } from "./routes/support.ts"
 import { UPLOAD_DIR } from "./storage.ts"
 
@@ -15,6 +17,7 @@ export function createApp() {
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }))
   // The mobile app sends no Origin header; CORS only matters for a future web dashboard.
   app.use(cors())
+  app.use(paystackWebhook) // needs the raw body, so it comes before express.json()
   app.use(express.json({ limit: "100kb" }))
 
   app.get("/health", (_req, res) => {
@@ -22,7 +25,7 @@ export function createApp() {
   })
   app.use("/uploads", express.static(UPLOAD_DIR, { fallthrough: false, index: false }))
 
-  app.use(authRouter, catalogRouter, ordersRouter, supportRouter, adminRouter)
+  app.use(authRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter)
 
   app.use((_req, _res, next) => next(new HttpError(404, "Not found.")))
   app.use(errorHandler)

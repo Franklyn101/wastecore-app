@@ -3,9 +3,10 @@ import { z } from "zod"
 import { requireAdmin, requireUser } from "../auth.ts"
 import { prisma } from "../db.ts"
 import type { Prisma } from "../generated/prisma/client.ts"
-import { OrderStatus, OrderType, TicketStatus } from "../generated/prisma/enums.ts"
+import { OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "../generated/prisma/enums.ts"
 import { HttpError } from "../http.ts"
-import { adminOrder, ticket } from "../serializers.ts"
+import { adminOrder, adminSubscription, ticket } from "../serializers.ts"
+import { today } from "../dates.ts"
 import { phoneSchema, trimmed } from "../validation.ts"
 
 // Operations API for staff: verify payments, assign collectors, close tickets.
@@ -57,13 +58,14 @@ async function findOrder(id: string | string[]) {
 }
 
 adminRouter.get("/admin/summary", async (_req, res) => {
-  const [orders, openTickets] = await Promise.all([
+  const [orders, openTickets, activePlans] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.supportTicket.count({ where: { status: { not: "RESOLVED" } } }),
+    prisma.subscription.count({ where: { status: "ACTIVE" } }),
   ])
   const counts = Object.fromEntries(Object.values(OrderStatus).map((s) => [s, 0])) as Record<OrderStatus, number>
   for (const row of orders) counts[row.status] = row._count._all
-  res.json({ orders: counts, openTickets })
+  res.json({ orders: counts, openTickets, activePlans })
 })
 
 adminRouter.get("/admin/orders", async (req, res) => {
@@ -77,7 +79,14 @@ adminRouter.get("/admin/orders", async (req, res) => {
       ...(digits.length >= 4 ? [{ user: { phone: { contains: digits } } }] : []),
     ]
   }
-  const orders = await prisma.order.findMany({ where, include: orderInclude, orderBy: { createdAt: "desc" }, take: 200 })
+  // Open work is listed by date due; everything else newest first.
+  const open = status === "PENDING" || status === "ASSIGNED"
+  const orders = await prisma.order.findMany({
+    where,
+    include: orderInclude,
+    orderBy: open ? [{ scheduledDate: "asc" }, { createdAt: "asc" }] : { createdAt: "desc" },
+    take: 200,
+  })
   res.json({ orders: orders.map(adminOrder) })
 })
 
@@ -113,6 +122,7 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
   if (status === "ASSIGNED" && !collectorId) throw new HttpError(400, "Choose a collector to assign.")
 
   if (status === "AWAITING_PAYMENT" && order.status === "PENDING") {
+    if (order.paymentMethod === "PAYSTACK") throw new HttpError(409, "This order was paid online and verified by Paystack.")
     // Rejecting a receipt: the customer must be told why, and can upload a new one.
     if (!body.customerNote) throw new HttpError(400, "Tell the customer why the receipt was rejected.")
     data.paidAt = null
@@ -127,6 +137,42 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
   const updated = await prisma.order.updateMany({ where: { id: order.id, status: order.status }, data })
   if (updated.count === 0) throw new HttpError(409, "This order was just changed by someone else. Refresh and try again.")
   res.json({ order: adminOrder(await findOrder(order.id)) })
+})
+
+adminRouter.get("/admin/subscriptions", async (req, res) => {
+  const { status } = z.object({ status: z.enum(SubscriptionStatus).optional() }).parse(req.query)
+  const subs = await prisma.subscription.findMany({
+    where: status ? { status } : { status: { in: ["ACTIVE", "EXPIRED"] } },
+    include: { collector: true, user: { select: { id: true, name: true, phone: true } } },
+    orderBy: [{ status: "asc" }, { currentPeriodEnd: "asc" }],
+    take: 500,
+  })
+  res.json({ subscriptions: subs.map(adminSubscription) })
+})
+
+// Sets a plan's regular collector and assigns them to its upcoming unassigned pickups.
+adminRouter.patch("/admin/subscriptions/:id", async (req, res) => {
+  const { collectorId } = z.object({ collectorId: z.string().nullable() }).parse(req.body)
+  const sub = await prisma.subscription.findUnique({ where: { id: req.params.id } })
+  if (!sub) throw new HttpError(404, "Plan not found.")
+  if (collectorId) {
+    const collector = await prisma.collector.findUnique({ where: { id: collectorId } })
+    if (!collector?.active) throw new HttpError(400, "Choose an active collector.")
+  }
+  const updated = await prisma.$transaction(async (tx) => {
+    if (collectorId) {
+      await tx.order.updateMany({
+        where: { subscriptionId: sub.id, status: "PENDING", scheduledDate: { gte: today() } },
+        data: { collectorId, status: "ASSIGNED" },
+      })
+    }
+    return tx.subscription.update({
+      where: { id: sub.id },
+      data: { collectorId },
+      include: { collector: true, user: { select: { id: true, name: true, phone: true } } },
+    })
+  })
+  res.json({ subscription: adminSubscription(updated) })
 })
 
 adminRouter.get("/admin/collectors", async (_req, res) => {

@@ -1,13 +1,13 @@
 import { router } from "expo-router"
 import { Pressable, Text, View } from "react-native"
-import { formatDate, naira, ORDER_STATUS, ORDER_TYPE_LABELS } from "../lib/format"
+import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus } from "../lib/format"
 import type { AdminOrder } from "../lib/types"
 import { colors, font, radius, spacing } from "../theme"
 import { Badge } from "./ui"
 
 /** One row in the staff order queue. */
 export function AdminOrderRow({ order }: { order: AdminOrder }) {
-  const status = ORDER_STATUS[order.status]
+  const status = orderStatus(order)
   const what = order.type === "WASTE_BAGS" ? `${order.planLabel} bags × ${order.quantity}` : order.planLabel
   return (
     <Pressable
@@ -37,7 +37,9 @@ export function AdminOrderRow({ order }: { order: AdminOrder }) {
         <Text style={[font.muted, { flexShrink: 1 }]} numberOfLines={1}>
           {formatDate(order.scheduledDate)} · {order.address}
         </Text>
-        <Text style={[font.label, { color: colors.primary }]}>{naira(order.amount)}</Text>
+        <Text style={[font.label, { color: colors.primary }]}>
+          {order.type === "PLAN_PICKUP" ? "Plan" : naira(order.amount)}
+        </Text>
       </View>
       {order.collector ? <Text style={font.muted}>Collector: {order.collector.name}</Text> : null}
     </Pressable>

@@ -32,7 +32,8 @@
           "photosPermission": "WasteCore needs access to your photos so you can upload payment receipts.",
           "cameraPermission": "WasteCore needs camera access so you can photograph payment receipts."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "scheme": "wastecore"
   }

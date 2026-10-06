@@ -21,7 +21,8 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: icon("home-outline") }} />
-      <Tabs.Screen name="orders" options={{ title: "My orders", tabBarIcon: icon("receipt-outline") }} />
+      <Tabs.Screen name="plan" options={{ title: "My plan", tabBarIcon: icon("calendar-outline") }} />
+      <Tabs.Screen name="orders" options={{ title: "Orders", tabBarIcon: icon("receipt-outline") }} />
       <Tabs.Screen name="support" options={{ title: "Support", tabBarIcon: icon("chatbubbles-outline") }} />
       <Tabs.Screen name="account" options={{ title: "Account", tabBarIcon: icon("person-outline") }} />
     </Tabs>

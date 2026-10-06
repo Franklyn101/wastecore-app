@@ -29,9 +29,11 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={isCustomer}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="book/pickup" options={{ title: "Book a pickup" }} />
-        <Stack.Screen name="book/upgrade" options={{ title: "Upgrade plan" }} />
+        <Stack.Screen name="book/pickup" options={{ title: "Instant pickup" }} />
+        <Stack.Screen name="book/plans" options={{ title: "Choose a plan" }} />
         <Stack.Screen name="book/bags" options={{ title: "Order waste bags" }} />
+        <Stack.Screen name="plan/checkout" options={{ title: "Payment" }} />
+        <Stack.Screen name="payment-return" options={{ title: "Payment" }} />
         <Stack.Screen name="orders/[id]" options={{ title: "Order details" }} />
         <Stack.Screen name="support/new" options={{ title: "Contact support" }} />
       </Stack.Protected>
@@ -39,6 +41,7 @@ function RootNavigator() {
         <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="admin/orders/[id]" options={{ title: "Manage order" }} />
         <Stack.Screen name="admin/collector" options={{ title: "Collector" }} />
+        <Stack.Screen name="admin/plans/[id]" options={{ title: "Customer plan" }} />
       </Stack.Protected>
     </Stack>
   )
