@@ -42,3 +42,8 @@ export const futureDateSchema = z
 
 export const trimmed = (max: number, label: string) =>
   z.string().trim().min(1, `${label} is required.`).max(max, `${label} must be at most ${max} characters.`)
+
+/** The current hour (0-23) in Lagos. */
+export function hourInLagos(now = new Date()): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", hourCycle: "h23" }).format(now))
+}

@@ -4,7 +4,7 @@ import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
 import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api } from "../../../lib/api"
 import { confirmAction } from "../../../lib/dialogs"
-import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus } from "../../../lib/format"
+import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../../lib/format"
 import type { AdminOrder, Collector } from "../../../lib/types"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
@@ -145,10 +145,11 @@ export default function ManageOrder() {
         <Card>
           <Row label={isBags ? "Bags" : "Plan"} value={order.planLabel} />
           {isBags ? <Row label="Packs" value={String(order.quantity)} /> : null}
+          {order.type === "INSTANT_PICKUP" ? <Row label="Bags" value={String(order.quantity)} /> : null}
           {order.wasteType ? <Row label="Waste type" value={order.wasteType} /> : null}
           <Row
-            label={isBags ? "Ordered" : "Pickup date"}
-            value={formatDate(order.scheduledDate)}
+            label={isBags ? "Ordered" : "Pickup"}
+            value={isBags ? formatDate(order.scheduledDate) : pickupWhen(order)}
           />
           <Row label={isBags ? "Deliver to" : "Address"} value={order.address} />
           <Row label="Amount" value={order.type === "PLAN_PICKUP" ? "Included in plan" : naira(order.amount)} />

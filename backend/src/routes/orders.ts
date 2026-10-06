@@ -9,14 +9,30 @@ import { HttpError } from "../http.ts"
 import { withUniqueReference } from "../references.ts"
 import { customerOrder } from "../serializers.ts"
 import { ALLOWED_IMAGE_TYPES, saveReceipt } from "../storage.ts"
-import { futureDateSchema, todayInLagos, trimmed } from "../validation.ts"
+import { addDays, toDay, ymd } from "../dates.ts"
+import { futureDateSchema, hourInLagos, todayInLagos, trimmed } from "../validation.ts"
 
 const address = trimmed(300, "Address")
 const wasteType = trimmed(100, "Waste type")
 
 // One-off services. Weekly and premium plans are subscriptions (routes/subscriptions.ts).
 const createOrderSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("INSTANT_PICKUP"), address, wasteType, pickupDate: futureDateSchema }),
+  z
+    .object({
+      type: z.literal("INSTANT_PICKUP"),
+      address,
+      wasteType,
+      bags: z.coerce
+        .number()
+        .int("Number of bags must be a whole number.")
+        .min(1, "Add at least 1 bag.")
+        .max(INSTANT_PICKUP.maxBags, `For more than ${INSTANT_PICKUP.maxBags} bags, please contact support.`)
+        .default(1),
+      // Either "as soon as possible" or a chosen date.
+      asap: z.boolean().default(false),
+      pickupDate: futureDateSchema.optional(),
+    })
+    .refine((b) => b.asap || b.pickupDate, { message: "Choose a pickup date.", path: ["pickupDate"] }),
   z.object({
     type: z.literal("WASTE_BAGS"),
     bagSize: z.enum(bagSizeIds, "Choose a bag size."),
@@ -31,6 +47,12 @@ const createOrderSchema = z.discriminatedUnion("type", [
 
 type CreateOrder = z.infer<typeof createOrderSchema>
 
+/** Same day if booked before the cutoff (Lagos time), otherwise the next day. */
+export function asapDate(now = new Date()): string {
+  const day = todayInLagos(now)
+  return hourInLagos(now) < INSTANT_PICKUP.asapCutoffHour ? day : ymd(addDays(toDay(day), 1))
+}
+
 /** Prices the order from the catalog. The client never sends an amount. */
 function orderData(body: CreateOrder) {
   if (body.type === "INSTANT_PICKUP") {
@@ -39,9 +61,10 @@ function orderData(body: CreateOrder) {
       plan: INSTANT_PICKUP.id,
       address: body.address,
       wasteType: body.wasteType,
-      scheduledDate: body.pickupDate,
-      quantity: 1,
-      amount: INSTANT_PICKUP.price,
+      scheduledDate: body.asap ? asapDate() : body.pickupDate!,
+      asap: body.asap,
+      quantity: body.bags,
+      amount: INSTANT_PICKUP.pricePerBag * body.bags,
     }
   }
   return {
@@ -89,7 +112,7 @@ ordersRouter.post("/orders", async (req, res) => {
   const data = orderData(createOrderSchema.parse(req.body))
   const order = await withUniqueReference("WC", (reference) =>
     prisma.order.create({
-      data: { ...data, scheduledDate: new Date(`${data.scheduledDate}T00:00:00Z`), reference, userId: user.id },
+      data: { ...data, scheduledDate: toDay(data.scheduledDate), reference, userId: user.id },
     }),
   )
   // Remember the address for next time, like the bot's returning-customer flow.

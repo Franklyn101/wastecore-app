@@ -14,6 +14,7 @@ export function customerOrder(order: Order) {
     address: order.address,
     wasteType: order.wasteType,
     scheduledDate: dateOnly(order.scheduledDate),
+    asap: order.asap,
     quantity: order.quantity,
     amount: order.amount,
     status: order.status,

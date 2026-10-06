@@ -5,8 +5,12 @@
 export const INSTANT_PICKUP = {
   id: "instant",
   name: "Instant Pickup",
-  description: "One-off pickup on the date you choose.",
-  price: 2000,
+  description: "One-time pickup, no subscription. Priced per bag.",
+  pricePerBag: 700,
+  maxBags: 20,
+  // "As soon as possible" orders booked before this hour (Lagos time) are picked up the same day;
+  // later ones the next day.
+  asapCutoffHour: 17,
 } as const
 
 export type BillingPeriod = { weeks: number } | { months: number }

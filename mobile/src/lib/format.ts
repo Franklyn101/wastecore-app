@@ -70,3 +70,27 @@ export const TICKET_STATUS: Record<TicketStatus, { label: string; tone: "warning
 export function isActive(status: OrderStatus): boolean {
   return status === "AWAITING_PAYMENT" || status === "PENDING" || status === "ASSIGNED"
 }
+
+/** The current hour (0-23) in Lagos. */
+export function hourInLagos(): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", hourCycle: "h23" }).format(new Date()))
+}
+
+/** "5pm" for 17. */
+export function hourLabel(hour: number): string {
+  return `${hour % 12 || 12}${hour < 12 ? "am" : "pm"}`
+}
+
+/** What an order is, in a few words: "3 bags", "Medium bags × 2", "2 pickups/week". */
+export function orderSummary(order: Pick<Order, "type" | "planLabel" | "quantity">): string {
+  if (order.type === "INSTANT_PICKUP") return `${order.quantity} bag${order.quantity === 1 ? "" : "s"}`
+  if (order.type === "WASTE_BAGS") return `${order.planLabel} bags × ${order.quantity}`
+  return order.planLabel
+}
+
+/** "As soon as possible · Today" or "Wed, 7 Oct 2026". */
+export function pickupWhen(order: Pick<Order, "asap" | "scheduledDate">): string {
+  if (!order.asap) return formatDate(order.scheduledDate)
+  const days = daysUntil(order.scheduledDate)
+  return `As soon as possible · ${days <= 0 ? "Today" : days === 1 ? "Tomorrow" : formatDate(order.scheduledDate)}`
+}

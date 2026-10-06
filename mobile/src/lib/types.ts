@@ -22,6 +22,7 @@ export type Order = {
   address: string
   wasteType: string | null
   scheduledDate: string
+  asap: boolean
   quantity: number
   amount: number
   status: OrderStatus
@@ -94,7 +95,14 @@ export type Plan = {
 }
 
 export type Catalog = {
-  instantPickup: { id: string; name: string; description: string; price: number }
+  instantPickup: {
+    id: string
+    name: string
+    description: string
+    pricePerBag: number
+    maxBags: number
+    asapCutoffHour: number
+  }
   plans: Plan[]
   bagSizes: { id: string; name: string; packSize: number; price: number }[]
   maxBagPacks: number

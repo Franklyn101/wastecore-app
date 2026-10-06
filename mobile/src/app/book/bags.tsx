@@ -1,13 +1,14 @@
 import { router } from "expo-router"
 import { useState } from "react"
-import { Pressable, StyleSheet, Text, View } from "react-native"
+import { Text } from "react-native"
+import { Stepper } from "../../components/Stepper"
 import { Button, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
 import { naira } from "../../lib/format"
 import { useSubmit } from "../../lib/useSubmit"
-import { colors, font, radius, spacing } from "../../theme"
+import { font } from "../../theme"
 
 export default function OrderBags() {
   const { user } = useAuth()
@@ -31,8 +32,6 @@ export default function OrderBags() {
     })
   }
 
-  const step = (delta: number) => setQuantity((q) => Math.min(catalog.maxBagPacks, Math.max(1, q + delta)))
-
   return (
     <Screen>
       <Section title="Bag size">
@@ -48,16 +47,7 @@ export default function OrderBags() {
         ))}
       </Section>
 
-      <View style={styles.stepperRow}>
-        <Text style={font.label}>Packs</Text>
-        <View style={styles.stepper}>
-          <StepButton label="−" onPress={() => step(-1)} disabled={quantity <= 1} a11y="Fewer packs" />
-          <Text style={styles.qty} accessibilityLiveRegion="polite">
-            {quantity}
-          </Text>
-          <StepButton label="+" onPress={() => step(1)} disabled={quantity >= catalog.maxBagPacks} a11y="More packs" />
-        </View>
-      </View>
+      <Stepper label="Packs" value={quantity} onChange={setQuantity} max={catalog.maxBagPacks} unit="packs" />
 
       <TextField label="Delivery address" value={address} onChangeText={setAddress} multiline />
 
@@ -72,32 +62,3 @@ export default function OrderBags() {
     </Screen>
   )
 }
-
-function StepButton({ label, onPress, disabled, a11y }: { label: string; onPress: () => void; disabled: boolean; a11y: string }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={a11y}
-      onPress={onPress}
-      disabled={disabled}
-      style={[styles.stepButton, disabled && { opacity: 0.4 }]}
-    >
-      <Text style={styles.stepText}>{label}</Text>
-    </Pressable>
-  )
-}
-
-const styles = StyleSheet.create({
-  stepperRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  stepper: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  stepButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepText: { fontSize: 22, fontWeight: "700", color: colors.primary },
-  qty: { minWidth: 32, textAlign: "center", fontSize: 18, fontWeight: "700", color: colors.text },
-})

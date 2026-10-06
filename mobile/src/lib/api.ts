@@ -74,7 +74,7 @@ const post = <T>(path: string, body?: unknown) =>
 export type AuthResponse = { token: string; user: User }
 
 export type NewOrder =
-  | { type: "INSTANT_PICKUP"; address: string; wasteType: string; pickupDate: string }
+  | { type: "INSTANT_PICKUP"; address: string; wasteType: string; bags: number; asap: boolean; pickupDate?: string }
   | { type: "WASTE_BAGS"; bagSize: string; quantity: number; address: string }
 
 export const api = {

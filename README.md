@@ -14,7 +14,7 @@ wastecore-app/
 
 | Bot menu option | In the app |
 | --- | --- |
-| 1 – Instant Pickup (₦2,000) | **Instant pickup**: address, waste type, date |
+| 1 – Instant Pickup (₦2,000) | **Instant pickup**: a one-time order with no subscription, **₦700 per bag**. Customers choose **As soon as possible** (same day if booked before 5pm Lagos time, otherwise the next day) or a date. |
 | 2 – Weekly Pickup | **Weekly plans** (subscription): 1/2/3 pickups per week at the bot's weekly prices, billed every 4 weeks |
 | 3 – Upgrade Plan | **Premium plans** (subscription): Basic, Standard or Premium, billed monthly. Customers on a plan can **upgrade** at any time. |
 | 4 – Order Waste Bags | **Waste bags**: size, number of packs, delivery address |

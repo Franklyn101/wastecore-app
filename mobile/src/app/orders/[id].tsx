@@ -8,7 +8,7 @@ import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen } from "../../co
 import { api } from "../../lib/api"
 import { useCatalog } from "../../lib/catalog"
 import { confirmAction } from "../../lib/dialogs"
-import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus } from "../../lib/format"
+import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../lib/format"
 import type { Order } from "../../lib/types"
 import { useFocusData } from "../../lib/useFocusData"
 import { useSubmit } from "../../lib/useSubmit"
@@ -196,10 +196,11 @@ export default function OrderDetails() {
           value={current.planLabel}
         />
         {current.type === "WASTE_BAGS" ? <Row label="Packs" value={String(current.quantity)} /> : null}
+        {current.type === "INSTANT_PICKUP" ? <Row label="Bags" value={String(current.quantity)} /> : null}
         {current.wasteType ? <Row label="Waste type" value={current.wasteType} /> : null}
         <Row
-          label={current.type === "WASTE_BAGS" ? "Ordered" : "Pickup date"}
-          value={formatDate(current.scheduledDate)}
+          label={current.type === "WASTE_BAGS" ? "Ordered" : "Pickup"}
+          value={current.type === "WASTE_BAGS" ? formatDate(current.scheduledDate) : pickupWhen(current)}
         />
         <Row label={current.type === "WASTE_BAGS" ? "Delivery address" : "Address"} value={current.address} />
         <Row label="Amount" value={current.type === "PLAN_PICKUP" ? "Included in your plan" : naira(current.amount)} />

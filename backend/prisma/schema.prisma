@@ -107,7 +107,8 @@ model Order {
   wasteType      String?
   // Pickup date, or (for bags) the order date.
   scheduledDate  DateTime       @db.Date
-  quantity       Int            @default(1)
+  asap           Boolean        @default(false) // instant pickup requested "as soon as possible"
+  quantity       Int            @default(1) // bags for an instant pickup, packs for a bag order
   amount         Int // naira due for this order; 0 for plan pickups (paid by the subscription)
   status         OrderStatus    @default(AWAITING_PAYMENT)
   paymentMethod  PaymentMethod?

@@ -1,6 +1,7 @@
 import request from "supertest"
 import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { createApp } from "../src/app.ts"
+import { asapDate } from "../src/routes/orders.ts"
 import { prisma } from "../src/db.ts"
 import { normalizePhone, todayInLagos } from "../src/validation.ts"
 import { resetDatabase } from "./helpers.ts"
@@ -136,7 +137,7 @@ describe("orders", () => {
       .post("/orders")
       .set(ada)
       .send({ type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
-    expect(body.order.amount).toBe(2000)
+    expect(body.order.amount).toBe(700) // 1 bag by default
 
     expect((await request(app).get(`/orders/${body.order.id}`).set(bayo)).status).toBe(404)
     expect((await request(app).post(`/orders/${body.order.id}/cancel`).set(bayo)).status).toBe(404)
@@ -257,5 +258,34 @@ describe("admin order workflow", () => {
     }
     const none = await request(app).get("/admin/orders").query({ q: "nobody" }).set(admin)
     expect(none.body.orders).toHaveLength(0)
+  })
+})
+
+describe("instant pickup", () => {
+  it("prices per bag and needs either ASAP or a date", async () => {
+    const auth = { Authorization: `Bearer ${await register()}` }
+    const book = (body: object) =>
+      request(app)
+        .post("/orders")
+        .set(auth)
+        .send({ type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Plastic", ...body })
+
+    const three = await book({ bags: 3, pickupDate: tomorrow })
+    expect(three.body.order).toMatchObject({ amount: 2100, quantity: 3, asap: false, scheduledDate: tomorrow })
+
+    const asap = await book({ bags: 2, asap: true })
+    expect(asap.body.order).toMatchObject({ amount: 1400, asap: true })
+    expect(asap.body.order.scheduledDate).toBe(asapDate())
+
+    expect((await book({ bags: 2 })).status).toBe(400) // no date and not ASAP
+    expect((await book({ bags: 0, asap: true })).status).toBe(400)
+    expect((await book({ bags: 21, asap: true })).status).toBe(400)
+  })
+
+  it("schedules ASAP for today before 5pm Lagos time and tomorrow after", () => {
+    // Lagos is UTC+1.
+    expect(asapDate(new Date("2026-10-07T15:59:00Z"))).toBe("2026-10-07") // 4:59pm
+    expect(asapDate(new Date("2026-10-07T16:00:00Z"))).toBe("2026-10-08") // 5:00pm
+    expect(asapDate(new Date("2026-10-07T23:30:00Z"))).toBe("2026-10-08") // 12:30am on the 8th: same day
   })
 })

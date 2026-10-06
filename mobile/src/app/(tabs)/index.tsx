@@ -40,7 +40,7 @@ export default function Home() {
   const services: Service[] = [
     {
       title: "Instant pickup",
-      subtitle: catalog ? naira(catalog.instantPickup.price) : "One-off pickup",
+      subtitle: catalog ? `One-time · ${naira(catalog.instantPickup.pricePerBag)}/bag` : "One-time pickup",
       icon: "flash-outline",
       href: "/book/pickup",
     },
