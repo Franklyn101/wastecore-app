@@ -1,0 +1,97 @@
+# Runs all of WasteCore on your computer for testing:
+#
+#   docker compose up --build
+#
+# Then open:
+#   App (web version)   http://localhost:8081
+#   Text messages       http://localhost:4597   (verification and reset codes)
+#   Emails              http://localhost:8025
+#   API                 http://localhost:4000
+#
+# Payments go to a stand-in Paystack checkout (no real money); texts and emails are caught
+# locally and never sent. Demo logins are listed in the README.
+# This setup is for testing only: its passwords and keys are public. Don't deploy it as is.
+
+name: wastecore
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wastecore
+      POSTGRES_PASSWORD: wastecore
+      POSTGRES_DB: wastecore
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wastecore"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://wastecore:wastecore@db:5432/wastecore
+      JWT_SECRET: local-testing-only-secret-0123456789abcdef
+      PUBLIC_URL: http://localhost:4000
+      # The app is opened at localhost:8081 in a browser, or through Expo Go on a phone.
+      APP_RETURN_URLS: http://localhost:8081/,exp://,exps://,wastecore://
+      PAYSTACK_SECRET_KEY: sk_test_local
+      PAYSTACK_BASE_URL: http://paystack:4599
+      TERMII_API_KEY: local
+      TERMII_SENDER_ID: WasteCore
+      TERMII_BASE_URL: http://sms:4597
+      SMTP_HOST: mail
+      SMTP_PORT: "1025"
+      EMAIL_FROM: WasteCore <no-reply@wastecore.local>
+      # Lets testers sign in and out a lot without being rate-limited.
+      AUTH_RATE_LIMIT: "1000"
+      NODE_ENV: development
+    # Migrate, add the demo accounts, then start.
+    command: sh -c "npx prisma migrate deploy && npx tsx scripts/seed-demo.ts && node dist/src/index.js"
+    ports:
+      - "4000:4000"
+    volumes:
+      - uploads:/app/uploads
+
+  # Stand-in for Paystack: a test checkout with Pay and Cancel buttons.
+  paystack:
+    build: ./backend
+    command: npx tsx scripts/paystack-mock.ts
+    environment:
+      PORT: "4599"
+    ports:
+      - "4599:4599"
+
+  # Stand-in for Termii: shows every text the API sends.
+  sms:
+    build: ./backend
+    command: npx tsx scripts/sms-mock.ts
+    environment:
+      PORT: "4597"
+    ports:
+      - "4597:4597"
+
+  # Catches emails (e.g. password reset codes) and shows them in a web page.
+  mail:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+
+  web:
+    build:
+      context: ./mobile
+      args:
+        EXPO_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - api
+    ports:
+      - "8081:8081"
+
+volumes:
+  db-data:
+  uploads:

@@ -133,6 +133,49 @@ AWAITING_PAYMENT ──receipt uploaded──▶ PENDING ──staff confirm + a
 
 Prices live in one place, `backend/src/catalog.ts`. The app reads them from `GET /catalog`, so a price change needs no app release. The server always calculates the amount and never trusts one sent by the client.
 
+## Try everything locally with Docker
+
+The quickest way to test the whole system on your computer. You only need [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```bash
+docker compose up --build
+```
+
+The first build takes a few minutes. Then open:
+
+| What | Where |
+| --- | --- |
+| The app (web version) | http://localhost:8081 |
+| **Text messages**: verification and password reset codes | http://localhost:4597 |
+| **Emails**: password reset emails | http://localhost:8025 |
+| The API | http://localhost:4000 |
+
+Demo accounts (created automatically):
+
+| Role | Phone | Password |
+| --- | --- | --- |
+| Staff | 08090000001 | staff-password-123 |
+| Customer | 08035551234 | customer-pass-1 |
+| Collector | 07011112222 | collector-pass-1 |
+
+You can also sign up new customers and collectors; their codes appear in the text messages page.
+
+**What's real and what's a stand-in:**
+- **Paystack:** a test checkout page with **Pay** and **Cancel** buttons. No real money moves.
+- **SMS and email:** caught locally and shown on the pages above, never sent.
+- **Push notifications:** need a real phone build, so locally use the bell in the app.
+
+Stop with `Ctrl+C`. `docker compose down -v` also deletes the test data.
+
+**On a phone:**
+1. Keep Docker running.
+2. On your computer, run `cd mobile && npm install && EXPO_PUBLIC_API_URL=http://<your computer's LAN IP>:4000 npx expo start`.
+3. Scan the QR code with Expo Go.
+
+Paystack checkout won't open on the phone in this setup, because its stand-in runs on your computer's `localhost`. Use bank transfer with a receipt to test payments there.
+
+This setup is for testing only. Its passwords and keys are public, so don't deploy it as is.
+
 ## Run it locally
 
 You need Node.js 22.12+ and PostgreSQL 14+.
