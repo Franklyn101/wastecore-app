@@ -100,6 +100,11 @@ export const api = {
     post<AuthResponse>("/auth/register-collector", body),
   login: (body: { phone: string; password: string }) => post<AuthResponse>("/auth/login", body),
   me: () => request<{ user: User }>("/me"),
+  requestPasswordReset: (phone: string) =>
+    post<{ message: string; resendAfterSeconds: number }>("/auth/password-reset/request", { phone }),
+  confirmPasswordReset: (body: { phone: string; code: string; password: string }) =>
+    post<AuthResponse>("/auth/password-reset/confirm", body),
+  changePassword: (body: { currentPassword: string; password: string }) => post<AuthResponse>("/me/password", body),
   updateProfile: (body: { name?: string; address?: string; email?: string }) => patch<{ user: User }>("/me", body),
 
   catalog: () => request<Catalog>("/catalog"),
@@ -158,6 +163,8 @@ export const api = {
     collectors: () => request<{ collectors: Collector[] }>("/admin/collectors"),
     setCollectorLogin: (id: string, password: string) =>
       request<{ collector: Collector }>(`/admin/collectors/${id}/login`, { method: "PUT", body: JSON.stringify({ password }) }),
+    setUserPassword: (phone: string, password: string) =>
+      post<{ user: { name: string; phone: string; role: string } }>("/admin/users/password", { phone, password }),
     approveCollector: (id: string) => post<{ collector: Collector }>(`/admin/collectors/${id}/approve`),
     rejectCollector: (id: string) => post<{ ok: true }>(`/admin/collectors/${id}/reject`),
     removeCollectorLogin: (id: string) =>

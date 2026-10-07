@@ -12,6 +12,7 @@ if (jwtSecret.length < 32) throw new Error("JWT_SECRET must be at least 32 chara
 const port = Number(process.env.PORT) || 4000
 
 export const config = {
+  isProduction: process.env.NODE_ENV === "production",
   databaseUrl: required("DATABASE_URL"),
   jwtSecret,
   port,
@@ -35,6 +36,22 @@ export const config = {
   // "Enhanced security for push notifications" in your Expo account.
   expoPushUrl: process.env.EXPO_PUSH_URL?.trim() || "https://exp.host/--/api/v2/push/send",
   expoAccessToken: process.env.EXPO_ACCESS_TOKEN?.trim() || "",
+  // SMS for password reset codes, via Termii (https://termii.com).
+  termii: {
+    apiKey: process.env.TERMII_API_KEY?.trim() || "",
+    senderId: process.env.TERMII_SENDER_ID?.trim() || "",
+    // Your account's base URL is shown on the Termii dashboard.
+    baseUrl: (process.env.TERMII_BASE_URL?.trim() || "https://api.ng.termii.com").replace(/\/$/, ""),
+    channel: process.env.TERMII_CHANNEL?.trim() || "dnd",
+  },
+  // Email for password reset codes, via any SMTP provider.
+  smtp: {
+    host: process.env.SMTP_HOST?.trim() || "",
+    port: Number(process.env.SMTP_PORT) || 587,
+    user: process.env.SMTP_USER?.trim() || "",
+    pass: process.env.SMTP_PASS?.trim() || "",
+    from: process.env.EMAIL_FROM?.trim() || "",
+  },
   // Sign-in and sign-up attempts allowed per IP address every 15 minutes.
   authRateLimit: Number(process.env.AUTH_RATE_LIMIT) || 20,
   // Background billing (renewals and expiry). Off in tests.

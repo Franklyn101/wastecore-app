@@ -60,6 +60,9 @@ export default function SignIn() {
             onSubmitEditing={submit}
           />
           <Button title="Sign in" onPress={submit} loading={busy} disabled={!phone || !password} />
+          <Link href="/forgot-password" style={{ color: colors.primary, fontWeight: "700", textAlign: "center" }}>
+            Forgot password?
+          </Link>
 
           <Text style={[font.body, { textAlign: "center" }]}>
             New to WasteCore?{" "}

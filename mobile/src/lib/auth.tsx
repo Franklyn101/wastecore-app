@@ -25,6 +25,8 @@ type AuthState = {
   signUpCollector: (name: string, phone: string, password: string, area: string) => Promise<void>
   signOut: () => Promise<void>
   setUser: (user: User) => void
+  /** Starts a session from a token the server just issued (after a password reset or change). */
+  acceptSession: (res: AuthResponse) => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -75,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accept(await api.registerCollector({ name, phone, password, area })),
       signOut,
       setUser,
+      acceptSession: accept,
     }),
     [user, loading, accept, signOut],
   )

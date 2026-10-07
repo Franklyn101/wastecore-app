@@ -28,6 +28,7 @@ function RootNavigator() {
       <Stack.Protected guard={!user}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         <Stack.Screen name="sign-up" options={{ title: "Create account" }} />
+        <Stack.Screen name="forgot-password" options={{ title: "Reset password" }} />
       </Stack.Protected>
       <Stack.Protected guard={isCustomer}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -51,6 +52,7 @@ function RootNavigator() {
       </Stack.Protected>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
+        <Stack.Screen name="change-password" options={{ title: "Change password" }} />
       </Stack.Protected>
     </Stack>
   )

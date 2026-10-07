@@ -1,3 +1,4 @@
+import { router } from "expo-router"
 import { Text } from "react-native"
 import { Button, Card, ErrorBanner, Row, Screen } from "../../../components/ui"
 import { api } from "../../../lib/api"
@@ -19,7 +20,8 @@ export default function CollectorAccount() {
         <Row label="Role" value="Collector" />
       </Card>
       {error ? <ErrorBanner message={error} /> : null}
-      <Text style={font.muted}>To change your details or password, ask the WasteCore office.</Text>
+      <Text style={font.muted}>To change your name, phone or area, ask the WasteCore office.</Text>
+      <Button title="Change password" variant="secondary" onPress={() => router.push("/change-password")} />
       <Button
         title="Sign out"
         variant="danger"

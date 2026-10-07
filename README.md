@@ -57,6 +57,18 @@ Deactivating a collector, or removing their login, stops them signing in.
 
 Collectors only see jobs assigned to them, and never see prices or payment details. The customer sees the collector's note, the photo, and the reason if a pickup couldn't be done. Staff see all of it on the order, with times.
 
+## Passwords
+
+- **Forgot password?** on the sign-in screen. The person enters their phone number and gets a 6-digit code by **SMS** (Termii), and also by **email** if the account has one. They enter the code and a new password, and they're signed in.
+  - The code expires after 15 minutes, allows 5 wrong tries, and works once.
+  - A new code can be sent once a minute, up to 5 an hour.
+  - The reply is the same whether or not the number has an account, so the screen can't be used to find out who uses WasteCore.
+- **Change password** in each Account tab (needs the current password).
+- Changing or resetting a password **signs the account out on every other device**.
+- **Staff fallback:** in the staff Account tab, staff can set a temporary password for a customer or collector who can't receive the code (after checking who they are on a call). Staff accounts can't be reset this way.
+
+Set `TERMII_*` and `SMTP_*` in `backend/.env` (see `.env.example`). For SMS to reach numbers on Do-Not-Disturb (most Nigerian lines), Termii needs an approved sender ID and the `dnd` channel. Without these settings, codes are printed in the server log, which is fine for local development.
+
 ## Notifications
 
 Customers, collectors and staff get **push notifications** on their phones, and every alert is also kept in the app's notification list (the bell at the top right, with an unread count). Tapping one opens the order, job or plan it's about.
@@ -157,6 +169,10 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | --- | --- | --- | --- |
 | POST | `/auth/register` | public | `{ name, phone, password }` → `{ token, user }` |
 | POST | `/auth/register-collector` | public | `{ name, phone, password, area }`: applies as a collector (needs staff approval) |
+| POST | `/auth/password-reset/request` | public | `{ phone }`: texts (and emails) a 6-digit code |
+| POST | `/auth/password-reset/confirm` | public | `{ phone, code, password }` → `{ token, user }` |
+| POST | `/me/password` | any | `{ currentPassword, password }` → a new token; other devices are signed out |
+| POST | `/admin/users/password` | admin | `{ phone, password }`: temporary password for a customer or collector |
 | POST | `/auth/login` | public | `{ phone, password }` → `{ token, user }` (customers, staff and collectors) |
 | GET / PATCH | `/me` | customer | Read or update name and default address |
 | GET | `/catalog` | public | Plans, prices, waste types, support categories, bank details |
@@ -221,4 +237,4 @@ Set `EXPO_PUBLIC_API_URL` to the production API URL in your EAS environment.
 ## Next steps
 
 - **Deploy** the API and database, and turn on Cloudinary, so the team can test on real phones.
-- **Phone number verification** (SMS OTP) at sign-up, and password reset.
+- **Phone number verification** at sign-up, reusing the SMS code sender built for password reset.

@@ -16,8 +16,15 @@ declare global {
   }
 }
 
-export function signToken(user: Pick<User, "id">): string {
-  return jwt.sign({}, config.jwtSecret, { subject: user.id, expiresIn: TOKEN_TTL, algorithm: "HS256" })
+/** Changes whenever the password does, so older tokens stop working. */
+const passwordVersion = (user: Pick<User, "passwordChangedAt">) => user.passwordChangedAt?.getTime() ?? 0
+
+export function signToken(user: Pick<User, "id" | "passwordChangedAt">): string {
+  return jwt.sign({ pv: passwordVersion(user) }, config.jwtSecret, {
+    subject: user.id,
+    expiresIn: TOKEN_TTL,
+    algorithm: "HS256",
+  })
 }
 
 /** Loads the signed-in user from the Bearer token, or rejects with 401. */
@@ -25,14 +32,18 @@ export async function requireUser(req: Request, _res: Response, next: NextFuncti
   const token = req.headers.authorization?.replace(/^Bearer /, "")
   if (!token) throw new HttpError(401, "Please sign in.")
 
-  let userId: string | undefined
+  let claims: jwt.JwtPayload
   try {
-    userId = jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"] }).sub as string | undefined
+    claims = jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"] }) as jwt.JwtPayload
   } catch {
     throw new HttpError(401, "Your session has expired. Please sign in again.")
   }
-  const user = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null
+  const user = claims.sub ? await prisma.user.findUnique({ where: { id: claims.sub } }) : null
   if (!user) throw new HttpError(401, "Your session has expired. Please sign in again.")
+  // Tokens from before the last password change no longer work.
+  if ((claims.pv ?? 0) !== passwordVersion(user)) {
+    throw new HttpError(401, "Your password was changed. Please sign in again.")
+  }
 
   req.user = user
   next()
