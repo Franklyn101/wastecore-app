@@ -1,12 +1,16 @@
-import { router } from "expo-router"
+import { router, useLocalSearchParams } from "expo-router"
+import { Text } from "react-native"
 import { useState } from "react"
 import { Button, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useCatalog } from "../../lib/catalog"
 import { notify } from "../../lib/dialogs"
 import { useSubmit } from "../../lib/useSubmit"
+import { font } from "../../theme"
 
 export default function NewTicket() {
+  // Opened from an order's "Report a problem", the ticket is linked to that order.
+  const { orderId, reference } = useLocalSearchParams<{ orderId?: string; reference?: string }>()
   const { catalog, error: catalogError, reload } = useCatalog()
   const [category, setCategory] = useState<string | null>(null)
   const [message, setMessage] = useState("")
@@ -24,6 +28,7 @@ export default function NewTicket() {
         category: category!,
         message: message.trim(),
         contactTime: contactTime.trim(),
+        ...(orderId ? { orderId } : {}),
       })
       const note = `Your ticket ID is ${ticket.reference}. A WasteCore agent will reach out shortly.`
       notify("Ticket raised", note)
@@ -33,6 +38,7 @@ export default function NewTicket() {
 
   return (
     <Screen>
+      {reference ? <Text style={font.muted}>About order {reference}</Text> : null}
       <Section title="What's the issue?">
         {catalog.supportCategories.map((c) => (
           <OptionCard key={c} title={c} selected={category === c} onPress={() => setCategory(c)} />

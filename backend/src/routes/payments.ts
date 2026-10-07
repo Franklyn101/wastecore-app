@@ -4,7 +4,8 @@ import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { paymentReference, recordPaystackResult, subscriptionCharge } from "../billing.ts"
 import { config } from "../config.ts"
 import { prisma } from "../db.ts"
-import type { Payment } from "../generated/prisma/client.ts"
+import { findPlan, planLabel } from "../catalog.ts"
+import type { Order, Payment } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
 import { initializeTransaction, isValidWebhookSignature, type PaystackTransaction, verifyTransaction } from "../paystack.ts"
 
@@ -96,6 +97,53 @@ paymentsRouter.post("/payments", requireUser, requireCustomer, async (req, res) 
   })
   res.status(201).json({ payment: publicPayment(payment), authorizationUrl: checkout.authorization_url })
 })
+
+// Everything the customer has paid: card/online payments, and bank transfers staff confirmed.
+paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) => {
+  const userId = currentUser(req).id
+  const [online, transfers] = await Promise.all([
+    prisma.payment.findMany({
+      where: { userId, status: "SUCCESS" },
+      include: { order: true, subscription: true },
+      orderBy: { paidAt: "desc" },
+      take: 200,
+    }),
+    prisma.order.findMany({
+      where: { userId, paymentMethod: "TRANSFER", paidAt: { not: null }, status: { not: "AWAITING_PAYMENT" } },
+      orderBy: { paidAt: "desc" },
+      take: 200,
+    }),
+  ])
+  const PURPOSE = { ORDER: "", SUBSCRIPTION_START: "Plan started", SUBSCRIPTION_RENEWAL: "Plan renewed" }
+  const rows = [
+    ...online.map((p) => ({
+      id: p.id,
+      reference: p.order?.reference ?? p.reference,
+      description: p.order ? orderDescription(p.order) : `${PURPOSE[p.purpose]}: ${findPlan(p.subscription!.plan).name}`,
+      amount: p.amount,
+      method: p.channel === "bank_transfer" ? "Paystack (transfer)" : p.channel === "ussd" ? "Paystack (USSD)" : "Paystack (card)",
+      paidAt: p.paidAt!,
+      orderId: p.orderId,
+      subscriptionId: p.subscriptionId,
+    })),
+    ...transfers.map((o) => ({
+      id: o.id,
+      reference: o.reference,
+      description: orderDescription(o),
+      amount: o.amount,
+      method: "Bank transfer",
+      paidAt: o.paidAt!,
+      orderId: o.id,
+      subscriptionId: null,
+    })),
+  ].sort((a, b) => b.paidAt.getTime() - a.paidAt.getTime())
+  res.json({ payments: rows, total: rows.reduce((sum, r) => sum + r.amount, 0) })
+})
+
+function orderDescription(o: Order) {
+  if (o.type === "WASTE_BAGS") return `${planLabel(o.plan)} bags × ${o.quantity}`
+  return `Instant pickup, ${o.quantity} bag${o.quantity === 1 ? "" : "s"}`
+}
 
 // The app calls this after checkout closes to learn whether the payment went through.
 paymentsRouter.get("/payments/:reference", requireUser, requireCustomer, async (req, res) => {

@@ -10,6 +10,8 @@ export type User = {
   role: "CUSTOMER" | "ADMIN" | "COLLECTOR"
 }
 
+export type TimeWindow = "MORNING" | "AFTERNOON"
+
 export type OrderType = "INSTANT_PICKUP" | "PLAN_PICKUP" | "WASTE_BAGS"
 
 export type OrderStatus = "AWAITING_PAYMENT" | "PENDING" | "ASSIGNED" | "COMPLETED" | "INCOMPLETE" | "CANCELLED"
@@ -28,6 +30,10 @@ export type Order = {
   wasteType: string | null
   scheduledDate: string
   asap: boolean
+  timeWindow: TimeWindow | null
+  skippedAt: string | null
+  rating: number | null
+  ratingComment: string | null
   quantity: number
   amount: number
   status: OrderStatus
@@ -60,6 +66,7 @@ export type Subscription = {
   lat: number | null
   lng: number | null
   wasteType: string
+  timeWindow: TimeWindow | null
   startDate: string
   currentPeriodStart: string | null
   currentPeriodEnd: string | null
@@ -91,6 +98,7 @@ export type SupportTicket = {
   category: string
   message: string
   contactTime: string
+  orderId: string | null
   status: TicketStatus
   createdAt: string
 }
@@ -119,6 +127,7 @@ export type Catalog = {
   bagSizes: { id: string; name: string; packSize: number; price: number }[]
   maxBagPacks: number
   wasteTypes: string[]
+  timeWindows: { id: TimeWindow; label: string; hours: string }[]
   supportCategories: string[]
   bank: { bankName: string; accountName: string; accountNumber: string }
   onlinePayments: boolean
@@ -144,7 +153,7 @@ export type AdminOrder = Order & { adminNote: string | null; customer: Customer;
 
 export type AdminSubscription = Subscription & { customer: Customer; collector: Collector | null }
 
-export type AdminTicket = SupportTicket & { customer: Customer }
+export type AdminTicket = SupportTicket & { customer: Customer; order: { id: string; reference: string } | null }
 
 export type AdminSummary = { orders: Record<OrderStatus, number>; openTickets: number; activePlans: number }
 
@@ -162,6 +171,7 @@ export type CollectorJob = {
   wasteType: string | null
   scheduledDate: string
   asap: boolean
+  timeWindow: TimeWindow | null
   quantity: number
   status: OrderStatus
   notes: string | null
@@ -170,12 +180,14 @@ export type CollectorJob = {
   completedAt: string | null
   collectorNote: string | null
   proofPhotoUrl: string | null
+  rating: number | null
+  ratingComment: string | null
 }
 
 export type CollectorJobs = {
   open: CollectorJob[]
   history: CollectorJob[]
-  stats: { doneToday: number; doneThisWeek: number }
+  stats: { doneToday: number; doneThisWeek: number; rating: number | null; ratings: number }
 }
 
 export type AppNotification = {
@@ -219,3 +231,15 @@ export type SavedAddress = {
 }
 
 export type AdminArea = ServiceArea & { savedAddresses: number; waitingCustomers: number; openOrders: number }
+
+/** One line of the customer's payment history. */
+export type PaymentRecord = {
+  id: string
+  reference: string
+  description: string
+  amount: number
+  method: string
+  paidAt: string
+  orderId: string | null
+  subscriptionId: string | null
+}

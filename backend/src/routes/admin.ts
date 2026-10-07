@@ -351,11 +351,11 @@ adminRouter.get("/admin/support-tickets", async (req, res) => {
   const { status } = z.object({ status: z.enum(TicketStatus).optional() }).parse(req.query)
   const tickets = await prisma.supportTicket.findMany({
     where: { status },
-    include: { user: { select: { id: true, name: true, phone: true } } },
+    include: { user: { select: { id: true, name: true, phone: true } }, order: { select: { id: true, reference: true } } },
     orderBy: { createdAt: "desc" },
     take: 200,
   })
-  res.json({ tickets: tickets.map((t) => ({ ...ticket(t), customer: t.user })) })
+  res.json({ tickets: tickets.map((t) => ({ ...ticket(t), customer: t.user, order: t.order })) })
 })
 
 adminRouter.patch("/admin/support-tickets/:id", async (req, res) => {

@@ -43,6 +43,7 @@ export function JobCard({ job }: { job: CollectorJob }) {
         </Text>
         <View style={{ flexDirection: "row", gap: spacing.xs }}>
           {job.asap && !closed ? <Badge label="ASAP" tone="warning" /> : null}
+          {job.timeWindow && !closed ? <Badge label={job.timeWindow === "MORNING" ? "Morning" : "Afternoon"} tone="info" /> : null}
           {overdue ? <Badge label="Overdue" tone="danger" /> : null}
           {job.onTheWayAt && !closed ? <Badge label="On the way" tone="success" /> : null}
           {job.status === "COMPLETED" ? <Badge label="Done" tone="success" /> : null}
@@ -54,6 +55,7 @@ export function JobCard({ job }: { job: CollectorJob }) {
       <Text style={font.muted}>
         {jobLoad(job) || "—"}
         {closed && job.completedAt ? ` · ${formatDate(job.completedAt)}` : ""}
+        {job.rating ? ` · ${job.rating}★` : ""}
       </Text>
     </Pressable>
   )

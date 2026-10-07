@@ -3,11 +3,12 @@ import { useEffect, useState } from "react"
 import { Text, View } from "react-native"
 import { AddressPicker } from "../../components/AddressPicker"
 import { DatePicker } from "../../components/DatePicker"
+import { TimeWindowPicker } from "../../components/TimeWindowPicker"
 import { Button, Card, Chip, ErrorBanner, Loading, OptionCard, Screen, Section } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useCatalog } from "../../lib/catalog"
 import { naira } from "../../lib/format"
-import type { Plan, PlanChangeQuote } from "../../lib/types"
+import type { Plan, PlanChangeQuote, TimeWindow } from "../../lib/types"
 import { useSubmit } from "../../lib/useSubmit"
 import { font, spacing } from "../../theme"
 
@@ -20,6 +21,7 @@ export default function ChoosePlan() {
   const [addressId, setAddressId] = useState<string | null>(null)
   const [wasteType, setWasteType] = useState<string | null>(null)
   const [date, setDate] = useState<string | null>(null)
+  const [timeWindow, setTimeWindow] = useState<TimeWindow | null>(null)
   const [quote, setQuote] = useState<PlanChangeQuote | null>(null)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const { busy, error, submit } = useSubmit()
@@ -42,7 +44,7 @@ export default function ChoosePlan() {
     void submit(async () => {
       const { subscription } = change
         ? await api.changePlan(change, plan!)
-        : await api.subscribe({ plan: plan!, addressId: addressId!, wasteType: wasteType!, startDate: date! })
+        : await api.subscribe({ plan: plan!, addressId: addressId!, wasteType: wasteType!, startDate: date!, timeWindow })
       router.replace({ pathname: "/plan/checkout", params: { id: subscription.id } })
     })
   }
@@ -119,6 +121,7 @@ export default function ChoosePlan() {
             </View>
           </View>
           <DatePicker label="First pickup" value={date} onChange={setDate} />
+          <TimeWindowPicker label="Preferred time" value={timeWindow} onChange={setTimeWindow} />
         </>
       )}
 

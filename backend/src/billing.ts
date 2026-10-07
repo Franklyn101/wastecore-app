@@ -47,6 +47,7 @@ async function createPlanPickups(tx: Tx, sub: Subscription, start: Date, end: Da
       lng: sub.lng,
       areaId: sub.areaId,
       wasteType: sub.wasteType,
+      timeWindow: sub.timeWindow,
       scheduledDate,
       amount: 0,
       status: sub.collectorId ? ("ASSIGNED" as const) : ("PENDING" as const),

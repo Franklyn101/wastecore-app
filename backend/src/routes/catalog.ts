@@ -5,6 +5,7 @@ import {
   MAX_BAG_PACKS,
   SUPPORT_CATEGORIES,
   PLANS,
+  TIME_WINDOWS,
   WASTE_TYPES,
 } from "../catalog.ts"
 import { config } from "../config.ts"
@@ -19,6 +20,7 @@ catalogRouter.get("/catalog", (_req, res) => {
     bagSizes: BAG_SIZES,
     maxBagPacks: MAX_BAG_PACKS,
     wasteTypes: WASTE_TYPES,
+    timeWindows: TIME_WINDOWS,
     supportCategories: SUPPORT_CATEGORIES,
     bank: config.bank,
     onlinePayments: paystackEnabled(),

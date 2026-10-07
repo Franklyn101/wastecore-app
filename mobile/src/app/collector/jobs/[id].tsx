@@ -7,7 +7,7 @@ import { MapView } from "../../../components/MapView"
 import { Badge, Button, Card, Chip, ErrorBanner, Loading, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api, type PickedImage } from "../../../lib/api"
 import { confirmAction } from "../../../lib/dialogs"
-import { formatDate } from "../../../lib/format"
+import { formatDate, pickupWhen } from "../../../lib/format"
 import type { CollectorJob } from "../../../lib/types"
 import { directionsUrl } from "../../../lib/location"
 import { useFocusData } from "../../../lib/useFocusData"
@@ -63,7 +63,7 @@ export default function Job() {
             {job.onTheWayAt && open ? <Badge label="On the way" tone="success" /> : null}
           </View>
         </View>
-        <Row label="When" value={job.asap ? `As soon as possible · ${formatDate(job.scheduledDate)}` : formatDate(job.scheduledDate)} />
+        <Row label="When" value={job.asap ? `As soon as possible · ${formatDate(job.scheduledDate)}` : pickupWhen(job)} />
         <Row label={job.type === "WASTE_BAGS" ? "Deliver" : "Collect"} value={jobLoad(job) || "—"} />
         <Row label="Reference" value={job.reference} />
       </Card>
@@ -172,6 +172,8 @@ export default function Job() {
           </Text>
           {job.completedAt ? <Row label="Closed" value={formatDate(job.completedAt)} /> : null}
           {job.collectorNote ? <Row label="Your note" value={job.collectorNote} /> : null}
+          {job.rating ? <Row label="Customer's rating" value={`${"★".repeat(job.rating)}${"☆".repeat(5 - job.rating)}`} /> : null}
+          {job.ratingComment ? <Text style={font.body}>"{job.ratingComment}"</Text> : null}
           {job.proofPhotoUrl ? (
             <Image source={{ uri: job.proofPhotoUrl }} style={styles.photo} resizeMode="cover" accessibilityLabel="Photo of the job" />
           ) : null}

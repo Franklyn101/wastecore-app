@@ -17,7 +17,13 @@ function what(order: Order) {
   return "Plan pickup"
 }
 
-const when = (order: Order) => (order.asap ? `ASAP, ${day(order.scheduledDate)}` : day(order.scheduledDate))
+const WINDOW = { MORNING: "morning", AFTERNOON: "afternoon" } as const
+const when = (order: Order) =>
+  order.asap
+    ? `ASAP, ${day(order.scheduledDate)}`
+    : order.timeWindow
+      ? `${day(order.scheduledDate)}, ${WINDOW[order.timeWindow]}`
+      : day(order.scheduledDate)
 const customerUrl = (order: Order) => `/orders/${order.id}`
 const staffUrl = (order: Order) => `/admin/orders/${order.id}`
 const jobUrl = (order: Order) => `/collector/jobs/${order.id}`
@@ -110,6 +116,36 @@ export const events = {
       title: "Job cancelled",
       body: `${order.reference} at ${order.address} has been cancelled.`,
     })
+  },
+
+  // ── Customer changes ─────────────────────────────────────
+  async rescheduled(order: Order) {
+    await notifyCollector(order.collectorId, {
+      title: "Pickup moved",
+      body: `${order.reference} at ${order.address} is now ${when(order)}.`,
+      url: jobUrl(order),
+    })
+    if (order.type === "INSTANT_PICKUP" && order.status !== "AWAITING_PAYMENT") {
+      await notifyStaff({ title: "Pickup rescheduled", body: `${order.reference} moved to ${when(order)}`, url: staffUrl(order) })
+    }
+  },
+
+  async skipped(order: Order) {
+    await notifyCollector(order.collectorId, {
+      title: "Pickup skipped",
+      body: `The customer at ${order.address} skipped ${day(order.scheduledDate)}'s pickup.`,
+    })
+  },
+
+  async rated(order: Order) {
+    // Staff follow up on poor ratings.
+    if (order.rating !== null && order.rating <= 2) {
+      await notifyStaff({
+        title: `${order.rating}-star rating`,
+        body: `${order.reference}${order.ratingComment ? `: "${order.ratingComment}"` : ""}`,
+        url: staffUrl(order),
+      })
+    }
   },
 
   async planCollectorSet(sub: Subscription, customerName: string) {

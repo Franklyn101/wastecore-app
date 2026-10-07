@@ -44,6 +44,7 @@ export default function CollectorJobs() {
       <View style={{ flexDirection: "row", gap: spacing.md }}>
         <Stat label="Done today" value={data.stats.doneToday} />
         <Stat label="Done this week" value={data.stats.doneThisWeek} />
+        {data.stats.rating !== null ? <Stat label={`Rating (${data.stats.ratings})`} value={`${data.stats.rating}★`} /> : null}
       </View>
 
       {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
@@ -65,7 +66,7 @@ export default function CollectorJobs() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <View
       style={{

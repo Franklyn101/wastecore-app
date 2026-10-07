@@ -38,6 +38,15 @@ Maps use OpenStreetMap through Leaflet, so no Google Maps key is needed. For hea
 
 The cities are added by the `service_areas` database migration. To add another city later, insert a `ServiceArea` row (slug, name, state, centre, radius, `active = false`, next `launchOrder`), then launch it from the app.
 
+## Managing pickups
+
+- **Time of day.** Pickups booked for a date (and plans) can be set to **Morning (8am to 12pm)** or **Afternoon (12pm to 5pm)**, or left as any time. A plan's preferred time can be changed under **My plan** and applies to its upcoming pickups. Collectors see the time on each job.
+- **Reschedule.** Customers can move a pickup to another day or time from the order screen until the collector sets off. Plan pickups stay within the paid period; one-off pickups can move up to 30 days ahead. The assigned collector is notified.
+- **Skip.** A single plan pickup can be skipped (for example when the customer is away). The others are unchanged.
+- **Ratings.** After a pickup or delivery is done, the customer rates it 1 to 5 stars with an optional comment. Staff are notified of 1 and 2-star ratings and see ratings on the order. Collectors see their average rating over the last 90 days.
+- **Report a problem.** Every paid order has a **Report a problem** button that opens a support ticket linked to the order. Staff jump from the ticket to the order.
+- **Payment history.** **Account → Payment history** lists online payments and confirmed bank transfers with a running total.
+
 ## Staff (admin) screens
 
 Staff use the **same app**. When someone with an admin account signs in, they get the staff tabs instead of the customer screens. It works on a phone or in a desktop browser (`npm run web`).
@@ -253,7 +262,11 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | GET | `/orders`, `/orders/:id` | customer | The customer's own orders |
 | POST | `/orders/:id/receipt` | customer | Multipart `receipt` image (JPEG/PNG/WEBP/HEIC, ≤ 5 MB) |
 | POST | `/orders/:id/cancel` | customer | Cancel an unpaid order |
-| POST / GET | `/support-tickets` | customer | Raise or list support tickets |
+| POST | `/orders/:id/reschedule` | customer | `{ date, timeWindow? }`: move a pickup before the collector sets off |
+| POST | `/orders/:id/skip` | customer | Skip one plan pickup |
+| POST | `/orders/:id/rating` | customer | `{ stars, comment? }` once the order is completed |
+| GET | `/payments` | customer | Payment history (online payments and confirmed transfers) with a total |
+| POST / GET | `/support-tickets` | customer | Raise or list support tickets; `orderId` links a ticket to an order |
 | POST / DELETE | `/me/push-tokens` | any | `{ token, platform }`: register or remove this phone for push |
 | GET | `/notifications` | any | The latest 50 notifications and the unread count |
 | POST | `/notifications/read` | any | `{ ids? }`: mark some, or all, as read |
@@ -261,7 +274,7 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | GET | `/subscriptions/:id` | customer | A plan with its upcoming pickups |
 | GET | `/subscriptions/:id/change-quote?plan=` | customer | Credit and amount due to switch plan today |
 | POST | `/subscriptions/:id/change` | customer | Start a plan change (replaces the current plan once paid) |
-| PATCH | `/subscriptions/:id` | customer | `{ autoRenew }` |
+| PATCH | `/subscriptions/:id` | customer | `{ autoRenew?, timeWindow? }` |
 | POST | `/subscriptions/:id/cancel` | customer | Drop an unpaid sign-up or plan change |
 | POST | `/payments` | customer | `{ orderId \| subscriptionId, email?, returnUrl? }` → Paystack checkout URL |
 | GET | `/payments/:reference` | customer | Verifies with Paystack and returns the outcome |

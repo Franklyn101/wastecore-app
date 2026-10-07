@@ -19,6 +19,10 @@ export function customerOrder(order: Order) {
     wasteType: order.wasteType,
     scheduledDate: dateOnly(order.scheduledDate),
     asap: order.asap,
+    timeWindow: order.timeWindow,
+    skippedAt: order.skippedAt,
+    rating: order.rating,
+    ratingComment: order.ratingComment,
     quantity: order.quantity,
     amount: order.amount,
     status: order.status,
@@ -78,6 +82,7 @@ export function collectorJob(order: Order & { user: { name: string; phone: strin
     wasteType: order.wasteType,
     scheduledDate: dateOnly(order.scheduledDate),
     asap: order.asap,
+    timeWindow: order.timeWindow,
     quantity: order.quantity,
     status: order.status,
     notes: order.adminNote,
@@ -86,6 +91,8 @@ export function collectorJob(order: Order & { user: { name: string; phone: strin
     completedAt: order.completedAt,
     collectorNote: order.collectorNote,
     proofPhotoUrl: order.proofPhotoUrl,
+    rating: order.rating,
+    ratingComment: order.ratingComment,
   }
 }
 
@@ -106,6 +113,7 @@ export function subscription(s: Subscription) {
     lat: s.lat,
     lng: s.lng,
     wasteType: s.wasteType,
+    timeWindow: s.timeWindow,
     startDate: dateOnly(s.startDate),
     currentPeriodStart: s.currentPeriodStart ? dateOnly(s.currentPeriodStart) : null,
     currentPeriodEnd: s.currentPeriodEnd ? dateOnly(s.currentPeriodEnd) : null,
@@ -131,6 +139,7 @@ export function ticket(t: SupportTicket) {
     category: t.category,
     message: t.message,
     contactTime: t.contactTime,
+    orderId: t.orderId,
     status: t.status,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,

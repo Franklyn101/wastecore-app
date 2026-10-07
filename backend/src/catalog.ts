@@ -115,6 +115,12 @@ export const SUPPORT_CATEGORIES = [
   "Other",
 ] as const
 
+// When in the day a pickup happens. Customers may also leave it as "any time".
+export const TIME_WINDOWS = [
+  { id: "MORNING", label: "Morning", hours: "8am to 12pm" },
+  { id: "AFTERNOON", label: "Afternoon", hours: "12pm to 5pm" },
+] as const
+
 export type BagSizeId = (typeof BAG_SIZES)[number]["id"]
 
 export const planIds = PLANS.map((p) => p.id) as [string, ...string[]]

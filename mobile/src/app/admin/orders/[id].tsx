@@ -121,6 +121,14 @@ export default function ManageOrder() {
         )}
       </Section>
 
+      {order.rating ? (
+        <Card style={order.rating <= 2 ? { backgroundColor: colors.dangerSoft, borderColor: colors.danger } : undefined}>
+          <Row label="Customer rating" value={`${"★".repeat(order.rating)}${"☆".repeat(5 - order.rating)}`} />
+          {order.ratingComment ? <Text style={font.body}>"{order.ratingComment}"</Text> : null}
+        </Card>
+      ) : null}
+      {order.skippedAt ? <Text style={font.muted}>The customer skipped this plan pickup.</Text> : null}
+
       {order.onTheWayAt || order.completedAt || order.collectorNote || order.proofPhotoUrl ? (
         <Section title="From the collector">
           <Card>

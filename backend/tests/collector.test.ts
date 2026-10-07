@@ -60,7 +60,7 @@ describe("collector app", () => {
       customer: { name: "Ada Obi", phone: "+2348012345678" },
     })
     expect(body.open[0].amount).toBeUndefined()
-    expect(body.stats).toEqual({ doneToday: 0, doneThisWeek: 0 })
+    expect(body.stats).toEqual({ doneToday: 0, doneThisWeek: 0, rating: null, ratings: 0 })
   })
 
   it("lets the customer see the collector is on the way, then the completed job with its photo", async () => {

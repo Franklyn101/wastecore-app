@@ -1,3 +1,4 @@
+import { router } from "expo-router"
 import { useState } from "react"
 import { Linking, ScrollView, Text, View } from "react-native"
 import { Badge, Button, Card, Chip, ErrorBanner, Loading, Screen } from "../../../components/ui"
@@ -6,7 +7,7 @@ import { formatDate, TICKET_STATUS } from "../../../lib/format"
 import type { AdminTicket, TicketStatus } from "../../../lib/types"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
-import { font, spacing } from "../../../theme"
+import { colors, font, spacing } from "../../../theme"
 
 const FILTERS: { status: TicketStatus | null; label: string }[] = [
   { status: "OPEN", label: "Open" },
@@ -62,6 +63,11 @@ function TicketCard({ ticket, onChanged }: { ticket: AdminTicket; onChanged: () 
       <Text style={font.muted}>
         {ticket.reference} · {formatDate(ticket.createdAt)}
       </Text>
+      {ticket.order ? (
+        <Text style={[font.label, { color: colors.primary }]} accessibilityRole="link" onPress={() => router.push(`/admin/orders/${ticket.order!.id}`)}>
+          About order {ticket.order.reference} →
+        </Text>
+      ) : null}
       {error ? <ErrorBanner message={error} /> : null}
       <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}>
         <Button

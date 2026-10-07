@@ -4,10 +4,12 @@ import { Text, View } from "react-native"
 import { AddressPicker } from "../../components/AddressPicker"
 import { DatePicker } from "../../components/DatePicker"
 import { Stepper } from "../../components/Stepper"
+import { TimeWindowPicker } from "../../components/TimeWindowPicker"
 import { Button, Chip, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useCatalog } from "../../lib/catalog"
 import { hourInLagos, hourLabel, naira } from "../../lib/format"
+import type { TimeWindow } from "../../lib/types"
 import { useSubmit } from "../../lib/useSubmit"
 import { font, spacing } from "../../theme"
 
@@ -20,6 +22,7 @@ export default function BookPickup() {
   const [bags, setBags] = useState(1)
   const [when, setWhen] = useState<"asap" | "date">("asap")
   const [date, setDate] = useState<string | null>(null)
+  const [timeWindow, setTimeWindow] = useState<TimeWindow | null>(null)
   const { busy, error, submit } = useSubmit()
 
   if (!catalog) return catalogError ? <ErrorBanner message={catalogError} onRetry={reload} /> : <Loading />
@@ -40,7 +43,7 @@ export default function BookPickup() {
         wasteType: waste!,
         bags,
         asap: when === "asap",
-        ...(when === "date" ? { pickupDate: date! } : {}),
+        ...(when === "date" ? { pickupDate: date!, timeWindow } : {}),
       })
       router.replace(`/orders/${order.id}`)
     })
@@ -81,7 +84,12 @@ export default function BookPickup() {
           onPress={() => setWhen("asap")}
         />
         <OptionCard title="Choose a date" selected={when === "date"} onPress={() => setWhen("date")} />
-        {when === "date" ? <DatePicker label="Pickup date" value={date} onChange={setDate} /> : null}
+        {when === "date" ? (
+          <>
+            <DatePicker label="Pickup date" value={date} onChange={setDate} />
+            <TimeWindowPicker value={timeWindow} onChange={setTimeWindow} />
+          </>
+        ) : null}
       </Section>
 
       {error ? <ErrorBanner message={error} /> : null}

@@ -44,7 +44,7 @@ collectorRouter.get("/collector/me", (req, res) => {
 collectorRouter.get("/collector/jobs", async (req, res) => {
   const collector = currentCollector(req)
   const startOfToday = startOfLagosDay(today())
-  const [open, history, doneToday, doneThisWeek] = await Promise.all([
+  const [open, history, doneToday, doneThisWeek, ratings] = await Promise.all([
     prisma.order.findMany({
       where: { collectorId: collector.id, status: "ASSIGNED", scheduledDate: { lte: addDays(today(), 60) } },
       include: jobInclude,
@@ -65,11 +65,22 @@ collectorRouter.get("/collector/jobs", async (req, res) => {
     prisma.order.count({
       where: { collectorId: collector.id, status: "COMPLETED", completedAt: { gte: addDays(startOfToday, -6) } },
     }),
+    // Customers' ratings over the last 90 days.
+    prisma.order.aggregate({
+      where: { collectorId: collector.id, ratedAt: { gte: addDays(startOfToday, -90) } },
+      _avg: { rating: true },
+      _count: { rating: true },
+    }),
   ])
   res.json({
     open: open.map(collectorJob),
     history: history.map(collectorJob),
-    stats: { doneToday, doneThisWeek },
+    stats: {
+      doneToday,
+      doneThisWeek,
+      rating: ratings._count.rating ? Math.round(ratings._avg.rating! * 10) / 10 : null,
+      ratings: ratings._count.rating,
+    },
   })
 })
 

@@ -1,4 +1,4 @@
-import type { Collector, Order, OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "./types"
+import type { Collector, Order, OrderStatus, OrderType, SubscriptionStatus, TicketStatus, TimeWindow } from "./types"
 
 export function naira(amount: number): string {
   return `₦${amount.toLocaleString("en-NG")}`
@@ -89,9 +89,14 @@ export function orderSummary(order: Pick<Order, "type" | "planLabel" | "quantity
   return order.planLabel
 }
 
-/** "As soon as possible · Today" or "Wed, 7 Oct 2026". */
-export function pickupWhen(order: Pick<Order, "asap" | "scheduledDate">): string {
-  if (!order.asap) return formatDate(order.scheduledDate)
+export const TIME_WINDOW_LABELS: Record<TimeWindow, string> = { MORNING: "Morning (8am–12pm)", AFTERNOON: "Afternoon (12–5pm)" }
+
+/** "As soon as possible · Today", "Wed, 7 Oct 2026 · Morning (8am–12pm)" or "Wed, 7 Oct 2026". */
+export function pickupWhen(order: Pick<Order, "asap" | "scheduledDate"> & { timeWindow?: TimeWindow | null }): string {
+  if (!order.asap) {
+    const date = formatDate(order.scheduledDate)
+    return order.timeWindow ? `${date} · ${TIME_WINDOW_LABELS[order.timeWindow]}` : date
+  }
   const days = daysUntil(order.scheduledDate)
   return `As soon as possible · ${days <= 0 ? "Today" : days === 1 ? "Tomorrow" : formatDate(order.scheduledDate)}`
 }

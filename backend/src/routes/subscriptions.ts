@@ -5,15 +5,19 @@ import { planChangeQuote, RENEW_WINDOW_DAYS } from "../billing.ts"
 import { planIds } from "../catalog.ts"
 import { daysBetween, toDay, today } from "../dates.ts"
 import { prisma } from "../db.ts"
+import { TimeWindow } from "../generated/prisma/enums.ts"
 import { HttpError } from "../http.ts"
 import { locationFields, resolveLocation } from "./areas.ts"
 import { customerOrder, subscription } from "../serializers.ts"
 import { futureDateSchema, trimmed } from "../validation.ts"
 
+const timeWindow = z.enum(TimeWindow, "Choose morning or afternoon.").nullable().optional()
+
 const createSchema = z.object({
   plan: z.enum(planIds, "Choose a plan."),
   ...locationFields,
   wasteType: trimmed(100, "Waste type"),
+  timeWindow,
   startDate: futureDateSchema,
 })
 
@@ -66,6 +70,7 @@ subscriptionsRouter.post("/subscriptions", async (req, res) => {
     data: {
       plan: body.plan,
       wasteType: body.wasteType,
+      timeWindow: body.timeWindow ?? null,
       ...location,
       startDate: toDay(body.startDate),
       userId: user.id,
@@ -101,6 +106,7 @@ subscriptionsRouter.post("/subscriptions/:id/change", async (req, res) => {
       lng: current.lng,
       areaId: current.areaId,
       wasteType: current.wasteType,
+      timeWindow: current.timeWindow,
       startDate: today(),
       credit: quote.credit,
       replacesId: current.id,
@@ -114,13 +120,25 @@ subscriptionsRouter.post("/subscriptions/:id/change", async (req, res) => {
 })
 
 subscriptionsRouter.patch("/subscriptions/:id", async (req, res) => {
-  const { autoRenew } = z.object({ autoRenew: z.boolean() }).parse(req.body)
+  const body = z
+    .object({ autoRenew: z.boolean().optional(), timeWindow })
+    .refine((b) => b.autoRenew !== undefined || b.timeWindow !== undefined, "Nothing to update.")
+    .parse(req.body)
   const sub = await findOwn(req.params.id, currentUser(req).id)
   if (sub.status !== "ACTIVE") throw new HttpError(409, "Only an active plan can be changed.")
-  if (autoRenew && !sub.authorizationCode) {
+  if (body.autoRenew && !sub.authorizationCode) {
     throw new HttpError(409, "Pay once by card to turn on automatic renewal.")
   }
-  const updated = await prisma.subscription.update({ where: { id: sub.id }, data: { autoRenew } })
+  const updated = await prisma.$transaction(async (tx) => {
+    // A new preferred time applies to the plan's upcoming pickups too.
+    if (body.timeWindow !== undefined) {
+      await tx.order.updateMany({
+        where: { subscriptionId: sub.id, status: { in: ["PENDING", "ASSIGNED"] }, scheduledDate: { gte: today() }, onTheWayAt: null },
+        data: { timeWindow: body.timeWindow },
+      })
+    }
+    return tx.subscription.update({ where: { id: sub.id }, data: body })
+  })
   res.json({ subscription: subscription(updated) })
 })
 

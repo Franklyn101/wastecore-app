@@ -34,6 +34,12 @@ enum OrderStatus {
   CANCELLED
 }
 
+// Part of the day a pickup should happen. Null means any time.
+enum TimeWindow {
+  MORNING // 8am to 12pm
+  AFTERNOON // 12pm to 5pm
+}
+
 enum PaymentMethod {
   PAYSTACK // verified automatically
   TRANSFER // bank transfer, checked by staff against the uploaded receipt
@@ -237,6 +243,12 @@ model Order {
   // Pickup date, or (for bags) the order date.
   scheduledDate  DateTime       @db.Date
   asap           Boolean        @default(false) // instant pickup requested "as soon as possible"
+  timeWindow     TimeWindow?
+  skippedAt      DateTime? // a plan pickup the customer chose to skip (status CANCELLED)
+  // The customer's rating of a completed pickup or delivery.
+  rating         Int? // 1 to 5
+  ratingComment  String?
+  ratedAt        DateTime?
   quantity       Int            @default(1) // bags for an instant pickup, packs for a bag order
   amount         Int // naira due for this order; 0 for plan pickups (paid by the subscription)
   status         OrderStatus    @default(AWAITING_PAYMENT)
@@ -260,6 +272,7 @@ model Order {
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   area         ServiceArea?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
   payments     Payment[]
+  tickets      SupportTicket[]
 
   @@index([userId, createdAt])
   @@index([status, scheduledDate])
@@ -278,6 +291,7 @@ model Subscription {
   lng                Float?
   areaId             String?
   wasteType          String
+  timeWindow         TimeWindow? // preferred time for the plan's pickups
   // Billing period [currentPeriodStart, currentPeriodEnd); end is exclusive. Set when first paid.
   startDate          DateTime           @db.Date
   currentPeriodStart DateTime?          @db.Date
@@ -339,11 +353,13 @@ model SupportTicket {
   category    String
   message     String
   contactTime String
+  orderId     String? // the order this is about, when reported from an order
   status      TicketStatus @default(OPEN)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
 }

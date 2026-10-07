@@ -59,6 +59,7 @@ export default function Account() {
       {saved && !changed ? <Text style={font.muted}>Saved.</Text> : null}
       <Button title="Save changes" onPress={save} loading={busy} disabled={!changed || !name.trim()} />
       <Button title="My addresses" variant="secondary" onPress={() => router.push("/addresses")} />
+      <Button title="Payment history" variant="secondary" onPress={() => router.push("/payments")} />
       <Button title="Change password" variant="secondary" onPress={() => router.push("/change-password")} />
       <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
     </Screen>

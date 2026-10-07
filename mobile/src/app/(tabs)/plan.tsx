@@ -1,10 +1,11 @@
 import { router } from "expo-router"
 import { useState } from "react"
-import { Switch, Text, View } from "react-native"
+import { Pressable, Switch, Text, View } from "react-native"
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, Section } from "../../components/ui"
 import { api } from "../../lib/api"
 import { confirmAction } from "../../lib/dialogs"
-import { daysUntil, formatDate, naira, orderStatus, SUBSCRIPTION_STATUS } from "../../lib/format"
+import { TimeWindowPicker } from "../../components/TimeWindowPicker"
+import { daysUntil, formatDate, naira, orderStatus, pickupWhen, SUBSCRIPTION_STATUS } from "../../lib/format"
 import type { Subscription } from "../../lib/types"
 import { useFocusData } from "../../lib/useFocusData"
 import { useSubmit } from "../../lib/useSubmit"
@@ -141,6 +142,11 @@ export default function MyPlan() {
             />
           </View>
           {toggle.error ? <ErrorBanner message={toggle.error} /> : null}
+          <TimeWindowPicker
+            label="Preferred pickup time"
+            value={plan.timeWindow}
+            onChange={(w) => void toggle.submit(async () => setSub((await api.setPlanTime(plan.id, w)).subscription))}
+          />
           <Button
             title="Change or upgrade plan"
             variant="secondary"
@@ -155,13 +161,20 @@ export default function MyPlan() {
 
       {detail.data && detail.data.upcomingPickups.length > 0 ? (
         <Section title="Upcoming pickups">
+          <Text style={font.muted}>Tap a pickup to move or skip it.</Text>
           {detail.data.upcomingPickups.map((o) => (
-            <Card key={o.id} style={{ paddingVertical: spacing.md }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={font.label}>{formatDate(o.scheduledDate)}</Text>
-                <Badge label={orderStatus(o).label} tone={orderStatus(o).tone} />
-              </View>
-            </Card>
+            <Pressable
+              key={o.id}
+              accessibilityRole="button"
+              onPress={() => router.push(`/orders/${o.id}`)}
+            >
+              <Card style={{ paddingVertical: spacing.md }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm }}>
+                  <Text style={[font.label, { flexShrink: 1 }]}>{pickupWhen(o)}</Text>
+                  <Badge label={orderStatus(o).label} tone={orderStatus(o).tone} />
+                </View>
+              </Card>
+            </Pressable>
           ))}
         </Section>
       ) : null}

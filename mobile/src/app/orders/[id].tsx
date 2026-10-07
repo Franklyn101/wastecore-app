@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker"
 import { useLocalSearchParams } from "expo-router"
 import { useState } from "react"
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native"
+import { ChangePickup, RateOrder, ReportProblem } from "../../components/OrderActions"
 import { PayButton } from "../../components/PayButton"
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen } from "../../components/ui"
 import { api } from "../../lib/api"
@@ -50,7 +51,7 @@ function nextStepText(order: Order): string {
     case "INCOMPLETE":
       return "This order couldn't be completed. Contact support if you need help."
     case "CANCELLED":
-      return "This order was cancelled."
+      return order.skippedAt ? "You skipped this pickup. Your other plan pickups are unchanged." : "This order was cancelled."
   }
 }
 
@@ -121,6 +122,8 @@ export default function OrderDetails() {
           </View>
         ) : null}
       </Card>
+
+      <RateOrder order={current} onRated={setOrder} />
 
       {current.collectorNote || current.proofPhotoUrl ? (
         <Card style={current.status === "INCOMPLETE" ? { backgroundColor: colors.dangerSoft, borderColor: colors.danger } : undefined}>
@@ -237,6 +240,9 @@ export default function OrderDetails() {
           />
         </Card>
       ) : null}
+
+      <ChangePickup order={current} onChanged={setOrder} />
+      {current.status !== "AWAITING_PAYMENT" ? <ReportProblem order={current} /> : null}
 
       {current.status === "AWAITING_PAYMENT" ? (
         <>

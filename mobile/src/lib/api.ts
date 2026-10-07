@@ -14,12 +14,14 @@ import type {
   Order,
   OrderStatus,
   Payment,
+  PaymentRecord,
   PlanChangeQuote,
   SavedAddress,
   ServiceArea,
   Subscription,
   SupportTicket,
   TicketStatus,
+  TimeWindow,
   User,
 } from "./types"
 
@@ -95,7 +97,15 @@ async function appendImage(form: FormData, field: string, image: PickedImage) {
 export type AuthResponse = { token: string; user: User }
 
 export type NewOrder =
-  | { type: "INSTANT_PICKUP"; addressId: string; wasteType: string; bags: number; asap: boolean; pickupDate?: string }
+  | {
+      type: "INSTANT_PICKUP"
+      addressId: string
+      wasteType: string
+      bags: number
+      asap: boolean
+      pickupDate?: string
+      timeWindow?: TimeWindow | null
+    }
   | { type: "WASTE_BAGS"; bagSize: string; quantity: number; addressId: string }
 
 export type AddressInput = { label: string; address: string; landmark?: string | null; lat: number; lng: number }
@@ -137,6 +147,11 @@ export const api = {
   orders: () => request<{ orders: Order[] }>("/orders"),
   order: (id: string) => request<{ order: Order }>(`/orders/${id}`),
   cancelOrder: (id: string) => post<{ order: Order }>(`/orders/${id}/cancel`),
+  reschedule: (id: string, body: { date: string; timeWindow: TimeWindow | null }) =>
+    post<{ order: Order }>(`/orders/${id}/reschedule`, body),
+  skipPickup: (id: string) => post<{ order: Order }>(`/orders/${id}/skip`),
+  rateOrder: (id: string, body: { stars: number; comment?: string | null }) => post<{ order: Order }>(`/orders/${id}/rating`, body),
+  payments: () => request<{ payments: PaymentRecord[]; total: number }>("/payments"),
   async uploadReceipt(id: string, image: PickedImage) {
     const form = new FormData()
     await appendImage(form, "receipt", image)
@@ -147,7 +162,7 @@ export const api = {
   subscriptions: () => request<{ subscriptions: Subscription[]; renewWindowDays: number }>("/subscriptions"),
   subscription: (id: string) =>
     request<{ subscription: Subscription; upcomingPickups: Order[] }>(`/subscriptions/${id}`),
-  subscribe: (body: { plan: string; addressId: string; wasteType: string; startDate: string }) =>
+  subscribe: (body: { plan: string; addressId: string; wasteType: string; startDate: string; timeWindow?: TimeWindow | null }) =>
     post<{ subscription: Subscription }>("/subscriptions", body),
   changeQuote: (id: string, plan: string) =>
     request<{ quote: PlanChangeQuote }>(`/subscriptions/${id}/change-quote${query({ plan })}`),
@@ -155,13 +170,15 @@ export const api = {
     post<{ subscription: Subscription; quote: PlanChangeQuote }>(`/subscriptions/${id}/change`, { plan }),
   setAutoRenew: (id: string, autoRenew: boolean) =>
     patch<{ subscription: Subscription }>(`/subscriptions/${id}`, { autoRenew }),
+  setPlanTime: (id: string, timeWindow: TimeWindow | null) =>
+    patch<{ subscription: Subscription }>(`/subscriptions/${id}`, { timeWindow }),
   cancelSubscription: (id: string) => post<{ ok: true }>(`/subscriptions/${id}/cancel`),
 
   startPayment: (body: { orderId?: string; subscriptionId?: string; email?: string; returnUrl?: string }) =>
     post<{ payment: Payment; authorizationUrl: string }>("/payments", body),
   payment: (reference: string) => request<{ payment: Payment }>(`/payments/${encodeURIComponent(reference)}`),
 
-  createTicket: (body: { category: string; message: string; contactTime: string }) =>
+  createTicket: (body: { category: string; message: string; contactTime: string; orderId?: string }) =>
     post<{ ticket: SupportTicket }>("/support-tickets", body),
   tickets: () => request<{ tickets: SupportTicket[] }>("/support-tickets"),
 

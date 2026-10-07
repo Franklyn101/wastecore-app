@@ -45,6 +45,7 @@ function RootNavigator() {
         <Stack.Screen name="orders/[id]" options={{ title: "Order details" }} />
         <Stack.Screen name="support/new" options={{ title: "Contact support" }} />
         <Stack.Screen name="addresses/index" options={{ title: "My addresses" }} />
+        <Stack.Screen name="payments" options={{ title: "Payment history" }} />
         <Stack.Screen name="addresses/edit" options={{ title: "Address" }} />
       </Stack.Protected>
       <Stack.Protected guard={isAdmin}>
