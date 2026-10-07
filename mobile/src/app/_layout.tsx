@@ -58,6 +58,8 @@ function RootNavigator() {
       <Stack.Protected guard={isCollector}>
         <Stack.Screen name="collector/(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="collector/jobs/[id]" options={{ title: "Job" }} />
+        <Stack.Screen name="collector/route" options={{ title: "Today's route" }} />
+        <Stack.Screen name="collector/earnings" options={{ title: "Earnings" }} />
       </Stack.Protected>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />

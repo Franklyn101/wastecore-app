@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { View } from "react-native"
 import type { ServiceArea } from "../lib/types"
-import LeafletMap from "./LeafletMap"
+import LeafletMap, { type MapMarker } from "./LeafletMap"
 
 type Point = { lat: number; lng: number }
 
@@ -12,11 +12,13 @@ type Props = {
   picker?: boolean
   pin?: Point | null
   areas?: ServiceArea[]
+  markers?: MapMarker[]
+  start?: Point | null
   onMove?: (point: Point) => void
 }
 
 /** A map of the spot (and, optionally, our service areas). See LeafletMap for how it's drawn. */
-export function MapView({ center, zoom = 16, height = 280, picker, pin, areas = [], onMove }: Props) {
+export function MapView({ center, zoom = 16, height = 280, picker, pin, areas = [], markers, start, onMove }: Props) {
   const circles = useMemo(
     () =>
       areas.map((a) => ({
@@ -37,6 +39,8 @@ export function MapView({ center, zoom = 16, height = 280, picker, pin, areas = 
         picker={picker}
         pin={pin}
         circles={circles}
+        markers={markers}
+        start={start}
         onMove={onMove ? async (p) => onMove(p) : undefined}
         dom={{ style: { height }, scrollEnabled: false, matchContents: false }}
       />

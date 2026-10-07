@@ -52,6 +52,7 @@ export default function AdminCollectors() {
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={font.label}>{c.name}</Text>
             <View style={{ flexDirection: "row", gap: spacing.xs }}>
+              {c.onDuty ? <Badge label="On duty" tone="success" /> : null}
               {c.hasLogin ? <Badge label="App login" tone="info" /> : null}
               <Badge label={c.active ? "Active" : "Inactive"} tone={c.active ? "success" : "muted"} />
             </View>

@@ -2,9 +2,11 @@ import { router, Stack, useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import { Switch, Text, View } from "react-native"
 import { AreaChips } from "../../components/AreaChips"
-import { Badge, Button, Card, ErrorBanner, Loading, Screen, TextField } from "../../components/ui"
+import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { confirmAction } from "../../lib/dialogs"
+import { formatDate, naira } from "../../lib/format"
+import type { Earnings } from "../../lib/types"
 import { useSubmit } from "../../lib/useSubmit"
 import { colors, font } from "../../theme"
 
@@ -80,6 +82,8 @@ export default function CollectorEditor() {
       ) : null}
       <Button title={id ? "Save changes" : "Add collector"} onPress={save} loading={busy} disabled={!ready} />
 
+      {id ? <CollectorPay id={id} name={name} /> : null}
+
       {id ? (
         <Card>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -138,5 +142,58 @@ export default function CollectorEditor() {
         </Card>
       ) : null}
     </Screen>
+  )
+}
+
+/** What the collector is owed, and recording a payout once staff have paid them. */
+function CollectorPay({ id, name }: { id: string; name: string }) {
+  const [earnings, setEarnings] = useState<Earnings | null>(null)
+  const [note, setNote] = useState("")
+  const [done, setDone] = useState<string | null>(null)
+  const { busy, error, submit } = useSubmit()
+
+  useEffect(() => {
+    api.admin.earnings(id).then(setEarnings).catch(() => setEarnings(null))
+  }, [id])
+
+  if (!earnings) return null
+  const { unpaid } = earnings
+
+  function record() {
+    confirmAction(
+      `Record ${naira(unpaid.due)} paid to ${name}?`,
+      `Do this after you've sent the money. It covers their ${unpaid.jobs} unpaid job${unpaid.jobs === 1 ? "" : "s"}.`,
+      "Record payout",
+      () =>
+        void submit(async () => {
+          const res = await api.admin.recordPayout(id, note.trim() || undefined)
+          setEarnings(res.earnings)
+          setNote("")
+          setDone(`Recorded ${naira(res.payout.amount)}. ${name} has been notified.`)
+        }),
+      { destructive: false },
+    )
+  }
+
+  return (
+    <Card>
+      <Text style={font.heading}>Pay</Text>
+      <Row label={`Unpaid jobs (${unpaid.jobs})`} value={naira(unpaid.earned)} />
+      {unpaid.cashHeld ? <Row label="Cash they took for extra bags" value={`− ${naira(unpaid.cashHeld)}`} /> : null}
+      <Row label="Due now" value={naira(unpaid.due)} />
+      {earnings.payouts[0] ? (
+        <Text style={font.muted}>
+          Last paid {naira(earnings.payouts[0].amount)} on {formatDate(earnings.payouts[0].createdAt)}
+        </Text>
+      ) : null}
+      {error ? <ErrorBanner message={error} /> : null}
+      {done ? <Text style={[font.label, { color: colors.primary }]}>{done}</Text> : null}
+      {unpaid.jobs > 0 ? (
+        <>
+          <TextField label="Note (optional)" placeholder="e.g. transfer reference" value={note} onChangeText={setNote} maxLength={200} />
+          <Button title={`Record payout · ${naira(unpaid.due)}`} variant="secondary" loading={busy} onPress={record} />
+        </>
+      ) : null}
+    </Card>
   )
 }

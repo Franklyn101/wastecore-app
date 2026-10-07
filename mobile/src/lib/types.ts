@@ -35,6 +35,11 @@ export type Order = {
   rating: number | null
   ratingComment: string | null
   quantity: number
+  /** Bags the collector actually took; extra bags on an instant pickup are owed as `extraAmount`. */
+  bagsCollected: number | null
+  extraAmount: number
+  extraPaidAt: string | null
+  extraPaymentMethod: "PAYSTACK" | "TRANSFER" | "CASH" | null
   amount: number
   status: OrderStatus
   paymentMethod: "PAYSTACK" | "TRANSFER" | null
@@ -144,6 +149,7 @@ export type Collector = {
   area: string
   serviceAreaId: string | null
   active: boolean
+  onDuty: boolean
   /** Signed up in the app and waiting for staff approval. */
   pending: boolean
   hasLogin: boolean
@@ -182,6 +188,11 @@ export type CollectorJob = {
   proofPhotoUrl: string | null
   rating: number | null
   ratingComment: string | null
+  bagsCollected: number | null
+  extraAmount: number
+  extraPaid: boolean
+  /** What the collector earns for it, once completed. */
+  pay: number | null
 }
 
 export type CollectorJobs = {
@@ -242,4 +253,23 @@ export type PaymentRecord = {
   paidAt: string
   orderId: string | null
   subscriptionId: string | null
+}
+
+export type RouteStop = CollectorJob & { legKm: number | null }
+
+export type Earnings = {
+  rates: { pickup: number; perBag: number; bagDelivery: number }
+  unpaid: { jobs: number; earned: number; cashHeld: number; due: number }
+  lastSevenDays: { jobs: number; earned: number }
+  payouts: { id: string; amount: number; jobs: number; note: string | null; createdAt: string }[]
+}
+
+export type CollectorProfile = {
+  id: string
+  name: string
+  phone: string
+  area: string
+  status: "PENDING" | "APPROVED"
+  onDuty: boolean
+  onDutySince: string | null
 }

@@ -75,9 +75,17 @@ Deactivating a collector, or removing their login, stops them signing in.
 | --- | --- |
 | **My jobs** | Their open pickups and bag deliveries, grouped Overdue / Today / Tomorrow / by date, with ASAP jobs flagged. Shows jobs done today and this week. |
 | **Job** | Customer name with **Call** and **WhatsApp**, the address and landmark with the spot on a map and **Directions**, what to collect or deliver, and staff notes (e.g. gate code). Tap **I'm on my way** (the customer sees "On the way"), then **Mark completed** with an optional photo and note, or **Couldn't complete** with a reason. |
-| **History** | Jobs they closed in the last 30 days, with their notes and photos. |
+| **History** | Jobs they closed in the last 30 days, with their notes, photos and the customer's rating. |
+| **On duty** | A switch on the jobs screen. Staff see who's on duty, and on-duty collectors are listed first when assigning. |
+| **Today's route** | Today's and overdue stops on a map, nearest first from where the collector is, with a **Navigate all stops in Google Maps** button. |
+| **Bags collected** | When completing a pickup, the collector enters the bags actually taken. On an instant pickup, extra bags are charged at the per-bag price: the customer either paid the collector in cash (switch on), or is asked to pay the balance in the app. |
+| **Earnings** | What they've earned since their last payout, the last 7 days, and past payouts. |
 
-Collectors only see jobs assigned to them, and never see prices or payment details. The customer sees the collector's note, the photo, and the reason if a pickup couldn't be done. Staff see all of it on the order, with times.
+**Pay.** Collectors earn ₦300 per pickup plus ₦50 per bag collected, and ₦200 per bag delivery (set in `backend/src/catalog.ts`, `COLLECTOR_PAY`). Staff open a collector to see what's due and tap **Record payout** after paying them; cash the collector took for extra bags is kept back. The collector is notified.
+
+**Weak signal.** The jobs list is saved on the phone. If there's no connection, "On my way", "Completed" and "Couldn't complete" are saved and sent automatically when signal returns (every 30 seconds, and when the app is reopened).
+
+Collectors only see jobs assigned to them, and never see order prices or payment details. The customer sees the collector's note, the photo, and the reason if a pickup couldn't be done. Staff see all of it on the order, with times.
 
 ## Phone verification
 
@@ -276,7 +284,7 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | POST | `/subscriptions/:id/change` | customer | Start a plan change (replaces the current plan once paid) |
 | PATCH | `/subscriptions/:id` | customer | `{ autoRenew?, timeWindow? }` |
 | POST | `/subscriptions/:id/cancel` | customer | Drop an unpaid sign-up or plan change |
-| POST | `/payments` | customer | `{ orderId \| subscriptionId, email?, returnUrl? }` → Paystack checkout URL |
+| POST | `/payments` | customer | `{ orderId \| subscriptionId, email?, returnUrl? }` → Paystack checkout URL (for a completed order with extra bags, pays the balance) |
 | GET | `/payments/:reference` | customer | Verifies with Paystack and returns the outcome |
 | GET | `/payments/paystack/callback` | Paystack | Browser return after checkout; sends the customer back to the app |
 | POST | `/payments/paystack/webhook` | Paystack | Signed payment notifications |
@@ -290,10 +298,15 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | POST | `/admin/collectors/:id/approve` | admin | Approves a collector who applied in the app |
 | POST | `/admin/collectors/:id/reject` | admin | Turns down an application and removes its login |
 | PUT / DELETE | `/admin/collectors/:id/login` | admin | `{ password }` creates the collector's app login or resets its password; DELETE removes it |
+| GET / PATCH | `/collector/me` | collector | Profile; `{ onDuty }` switches duty on or off |
+| GET | `/collector/route?lat=&lng=` | collector | Today's and overdue stops, nearest first, with distances |
+| GET | `/collector/earnings` | collector | Unpaid earnings, cash held, last 7 days and payouts |
+| GET | `/admin/collectors/:id/earnings` | admin | The same for one collector |
+| POST | `/admin/collectors/:id/payouts` | admin | `{ note? }`: records a payout for all unpaid completed jobs |
 | GET | `/collector/jobs` | collector | Open jobs, the last 30 days of closed jobs, and done-today/this-week counts |
 | GET | `/collector/jobs/:id` | collector | One of the collector's jobs |
 | POST | `/collector/jobs/:id/on-the-way` | collector | Tells the customer the collector is coming |
-| POST | `/collector/jobs/:id/complete` | collector | Multipart, with an optional `proof` photo and `note` |
+| POST | `/collector/jobs/:id/complete` | collector | Multipart, with optional `proof` photo, `note`, `bags` collected and `extraPaidCash` |
 | POST | `/collector/jobs/:id/incomplete` | collector | `{ reason }` (shown to the customer) |
 | GET | `/admin/subscriptions` | admin | Active and expired customer plans |
 | PATCH | `/admin/subscriptions/:id` | admin | `{ collectorId }`: sets the plan's regular collector and assigns its upcoming pickups |

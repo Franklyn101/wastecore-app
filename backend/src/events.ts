@@ -110,6 +110,22 @@ export const events = {
     if (byCollector) await notifyStaff({ title: "Job not completed", body: `${order.reference}: ${reason}`, url: staffUrl(order) })
   },
 
+  async extraBagsDue(order: Order) {
+    await notify(order.userId, {
+      title: "Extra bags collected",
+      body: `Your collector took ${order.bagsCollected} bags for ${order.reference} (you booked ${order.quantity}). Please pay ${naira(order.extraAmount)} for the extra bags.`,
+      url: customerUrl(order),
+    })
+  },
+
+  async payoutRecorded(collectorId: string, amount: number, jobs: number) {
+    await notifyCollector(collectorId, {
+      title: "You've been paid",
+      body: `${naira(amount)} for ${jobs} job${jobs === 1 ? "" : "s"}.`,
+      url: "/collector/earnings",
+    })
+  },
+
   async cancelledByStaff(order: Order) {
     await notify(order.userId, { title: "Order cancelled", body: `${order.reference} has been cancelled.`, url: customerUrl(order) })
     await notifyCollector(order.collectorId, {

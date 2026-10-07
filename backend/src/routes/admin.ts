@@ -2,7 +2,8 @@ import bcrypt from "bcryptjs"
 import { Router } from "express"
 import { z } from "zod"
 import { publicArea } from "../areas.ts"
-import { requireAdmin, requireUser } from "../auth.ts"
+import { currentUser, requireAdmin, requireUser } from "../auth.ts"
+import { earningsSummary } from "../earnings.ts"
 import { prisma } from "../db.ts"
 import type { Order, Prisma } from "../generated/prisma/client.ts"
 import { OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "../generated/prisma/enums.ts"
@@ -221,7 +222,7 @@ adminRouter.patch("/admin/subscriptions/:id", async (req, res) => {
 adminRouter.get("/admin/collectors", async (_req, res) => {
   const collectors = await prisma.collector.findMany({
     // Sign-ups waiting for approval first, then active, then inactive.
-    orderBy: [{ approvedAt: { sort: "desc", nulls: "first" } }, { active: "desc" }, { name: "asc" }],
+    orderBy: [{ approvedAt: { sort: "desc", nulls: "first" } }, { active: "desc" }, { onDuty: "desc" }, { name: "asc" }],
   })
   res.json({ collectors: collectors.map(adminCollector) })
 })
@@ -307,6 +308,35 @@ adminRouter.put("/admin/collectors/:id/login", async (req, res) => {
     })
   }
   res.json({ collector: adminCollector(await findCollector(collector.id)) })
+})
+
+// What a collector is owed since their last payout, and past payouts.
+adminRouter.get("/admin/collectors/:id/earnings", async (req, res) => {
+  const collector = await findCollector(req.params.id)
+  res.json(await earningsSummary(collector.id))
+})
+
+// Record that a collector was paid for all their unpaid completed jobs.
+adminRouter.post("/admin/collectors/:id/payouts", async (req, res) => {
+  const { note } = z.object({ note: z.string().trim().max(200).optional() }).parse(req.body ?? {})
+  const collector = await findCollector(req.params.id)
+  const payout = await prisma.$transaction(async (tx) => {
+    const jobs = await tx.order.findMany({
+      where: { collectorId: collector.id, status: "COMPLETED", collectorPay: { not: null }, payoutId: null },
+      select: { id: true, collectorPay: true, extraAmount: true, extraPaymentMethod: true },
+    })
+    if (jobs.length === 0) throw new HttpError(409, "Nothing to pay: no completed jobs since the last payout.")
+    // Cash the collector took for extra bags is kept back from their pay.
+    const amount = jobs.reduce((sum, j) => sum + j.collectorPay! - (j.extraPaymentMethod === "CASH" ? j.extraAmount : 0), 0)
+    const created = await tx.collectorPayout.create({
+      data: { collectorId: collector.id, amount, jobs: jobs.length, note: note || null, paidById: currentUser(req).id },
+    })
+    const claimed = await tx.order.updateMany({ where: { id: { in: jobs.map((j) => j.id) }, payoutId: null }, data: { payoutId: created.id } })
+    if (claimed.count !== jobs.length) throw new HttpError(409, "Someone else just recorded a payout. Refresh and try again.")
+    return created
+  })
+  await events.payoutRecorded(collector.id, payout.amount, payout.jobs)
+  res.status(201).json({ payout, earnings: await earningsSummary(collector.id) })
 })
 
 // Removes the collector's app login. Their jobs and history stay.

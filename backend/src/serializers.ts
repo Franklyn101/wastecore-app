@@ -24,6 +24,10 @@ export function customerOrder(order: Order) {
     rating: order.rating,
     ratingComment: order.ratingComment,
     quantity: order.quantity,
+    bagsCollected: order.bagsCollected,
+    extraAmount: order.extraAmount,
+    extraPaidAt: order.extraPaidAt,
+    extraPaymentMethod: order.extraPaymentMethod,
     amount: order.amount,
     status: order.status,
     paymentMethod: order.paymentMethod,
@@ -48,6 +52,7 @@ export function adminCollector(c: Collector) {
     area: c.area,
     serviceAreaId: c.serviceAreaId,
     active: c.active,
+    onDuty: c.onDuty,
     // Signed up in the app and waiting for staff to approve them.
     pending: !c.approvedAt,
     hasLogin: Boolean(c.userId),
@@ -93,6 +98,10 @@ export function collectorJob(order: Order & { user: { name: string; phone: strin
     proofPhotoUrl: order.proofPhotoUrl,
     rating: order.rating,
     ratingComment: order.ratingComment,
+    bagsCollected: order.bagsCollected,
+    extraAmount: order.extraAmount,
+    extraPaid: Boolean(order.extraPaidAt),
+    pay: order.collectorPay,
   }
 }
 

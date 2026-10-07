@@ -11,11 +11,14 @@ import type {
   Collector,
   CollectorJob,
   CollectorJobs,
+  CollectorProfile,
+  Earnings,
   Order,
   OrderStatus,
   Payment,
   PaymentRecord,
   PlanChangeQuote,
+  RouteStop,
   SavedAddress,
   ServiceArea,
   Subscription,
@@ -93,6 +96,8 @@ async function appendImage(form: FormData, field: string, image: PickedImage) {
     form.append(field, { uri: image.uri, name, type } as unknown as Blob)
   }
 }
+
+export type CompleteJob = { note?: string; photo?: PickedImage | null; bags?: number; extraPaidCash?: boolean }
 
 export type AuthResponse = { token: string; user: User }
 
@@ -201,6 +206,9 @@ export const api = {
       post<{ user: { name: string; phone: string; role: string } }>("/admin/users/password", { phone, password }),
     approveCollector: (id: string) => post<{ collector: Collector }>(`/admin/collectors/${id}/approve`),
     rejectCollector: (id: string) => post<{ ok: true }>(`/admin/collectors/${id}/reject`),
+    earnings: (id: string) => request<Earnings>(`/admin/collectors/${id}/earnings`),
+    recordPayout: (id: string, note?: string) =>
+      post<{ payout: { amount: number; jobs: number }; earnings: Earnings }>(`/admin/collectors/${id}/payouts`, { note }),
     removeCollectorLogin: (id: string) =>
       request<{ collector: Collector }>(`/admin/collectors/${id}/login`, { method: "DELETE" }),
     createCollector: (body: { name: string; phone: string; area: string; serviceAreaId?: string | null }) =>
@@ -216,16 +224,21 @@ export const api = {
   },
 
   collector: {
-    me: () =>
-      request<{ collector: { id: string; name: string; phone: string; area: string; status: "PENDING" | "APPROVED" } }>(
-        "/collector/me",
+    me: () => request<{ collector: CollectorProfile }>("/collector/me"),
+    setOnDuty: (onDuty: boolean) => patch<{ onDuty: boolean; onDutySince: string | null }>("/collector/me", { onDuty }),
+    route: (from: { lat: number; lng: number } | null) =>
+      request<{ stops: RouteStop[]; totalKm: number }>(
+        `/collector/route${from ? query({ lat: String(from.lat), lng: String(from.lng) }) : ""}`,
       ),
+    earnings: () => request<Earnings>("/collector/earnings"),
     jobs: () => request<CollectorJobs>("/collector/jobs"),
     job: (id: string) => request<{ job: CollectorJob }>(`/collector/jobs/${id}`),
     onTheWay: (id: string) => post<{ job: CollectorJob }>(`/collector/jobs/${id}/on-the-way`),
-    async complete(id: string, input: { note?: string; photo?: PickedImage | null }) {
+    async complete(id: string, input: CompleteJob) {
       const form = new FormData()
       if (input.note) form.append("note", input.note)
+      if (input.bags !== undefined) form.append("bags", String(input.bags))
+      if (input.extraPaidCash) form.append("extraPaidCash", "true")
       if (input.photo) await appendImage(form, "proof", input.photo)
       return request<{ job: CollectorJob }>(`/collector/jobs/${id}/complete`, { method: "POST", body: form })
     },

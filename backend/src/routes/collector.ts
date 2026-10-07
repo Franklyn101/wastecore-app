@@ -6,6 +6,8 @@ import { prisma } from "../db.ts"
 import type { Collector } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
 import { events } from "../events.ts"
+import { distanceKm } from "../areas.ts"
+import { earningsSummary, extraBagsCharge, payFor } from "../earnings.ts"
 import { collectorJob } from "../serializers.ts"
 import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
 
@@ -37,8 +39,47 @@ async function close(id: string, collector: Collector, data: Parameters<typeof p
 collectorRouter.get("/collector/me", (req, res) => {
   const c = currentCollector(req)
   res.json({
-    collector: { id: c.id, name: c.name, phone: c.phone, area: c.area, status: c.approvedAt ? "APPROVED" : "PENDING" },
+    collector: {
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      area: c.area,
+      status: c.approvedAt ? "APPROVED" : "PENDING",
+      onDuty: c.onDuty,
+      onDutySince: c.onDutySince,
+    },
   })
+})
+
+// "I'm working": on-duty collectors are the ones staff (and auto-assign) give jobs to.
+collectorRouter.patch("/collector/me", requireApprovedCollector, async (req, res) => {
+  const { onDuty } = z.object({ onDuty: z.boolean() }).parse(req.body)
+  const c = currentCollector(req)
+  const updated = await prisma.collector.update({
+    where: { id: c.id },
+    data: { onDuty, onDutySince: onDuty ? (c.onDuty ? c.onDutySince : new Date()) : null },
+  })
+  res.json({ onDuty: updated.onDuty, onDutySince: updated.onDutySince })
+})
+
+// Today's open jobs (and any overdue), in a sensible driving order from where the collector is.
+collectorRouter.get("/collector/route", requireApprovedCollector, async (req, res) => {
+  const from = z
+    .object({ lat: z.coerce.number().min(-90).max(90).optional(), lng: z.coerce.number().min(-180).max(180).optional() })
+    .parse(req.query)
+  const jobs = await prisma.order.findMany({
+    where: { collectorId: currentCollector(req).id, status: "ASSIGNED", scheduledDate: { lte: today() } },
+    include: jobInclude,
+  })
+  const ordered = planRoute(jobs, from.lat !== undefined && from.lng !== undefined ? { lat: from.lat, lng: from.lng } : null)
+  res.json({
+    stops: ordered.map(({ job, legKm }) => ({ ...collectorJob(job), legKm: legKm === null ? null : Math.round(legKm * 10) / 10 })),
+    totalKm: Math.round(ordered.reduce((sum, s) => sum + (s.legKm ?? 0), 0) * 10) / 10,
+  })
+})
+
+collectorRouter.get("/collector/earnings", requireApprovedCollector, async (req, res) => {
+  res.json(await earningsSummary(currentCollector(req).id))
 })
 
 collectorRouter.get("/collector/jobs", async (req, res) => {
@@ -105,19 +146,38 @@ collectorRouter.post("/collector/jobs/:id/on-the-way", async (req, res) => {
   res.json({ job: collectorJob(await prisma.order.findUniqueOrThrow({ where: { id: job.id }, include: jobInclude })) })
 })
 
-// Done. Optionally with a photo (multipart field "proof") and a note.
+const completeSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+  // Bags actually collected (pickups). Sent as a form field, so it arrives as text.
+  bags: z.coerce.number().int().min(0).max(200).optional(),
+  // The customer paid for extra bags in cash there and then.
+  extraPaidCash: z.preprocess((v) => v === true || v === "true", z.boolean()).optional(),
+})
+
+// Done. Optionally with a photo (multipart field "proof"), a note, and the bags collected.
 collectorRouter.post("/collector/jobs/:id/complete", imageUpload.single("proof"), async (req, res) => {
   const collector = currentCollector(req)
-  const { note } = z.object({ note: z.string().trim().max(500).optional() }).parse(req.body ?? {})
+  const { note, bags, extraPaidCash } = completeSchema.parse(req.body ?? {})
   const job = await openJob(req.params.id, collector)
+  const bagsCollected = job.type === "WASTE_BAGS" ? null : (bags ?? job.quantity)
+  const extraAmount = extraBagsCharge(job, bagsCollected)
 
   let proofPhotoUrl: string | undefined
   if (req.file) {
     if (!looksLikeImage(req.file.buffer)) throw new HttpError(400, "That file is not a valid image.")
     proofPhotoUrl = await saveImage(req.file, job.reference, "proof")
   }
-  const done = await close(job.id, collector, { status: "COMPLETED", collectorNote: note || null, proofPhotoUrl })
+  const done = await close(job.id, collector, {
+    status: "COMPLETED",
+    collectorNote: note || null,
+    proofPhotoUrl,
+    bagsCollected,
+    extraAmount,
+    ...(extraAmount && extraPaidCash ? { extraPaidAt: new Date(), extraPaymentMethod: "CASH" as const } : {}),
+    collectorPay: payFor(job, bagsCollected),
+  })
   await events.completed(done)
+  if (extraAmount && !extraPaidCash) await events.extraBagsDue(done)
   res.json({ job: collectorJob(done) })
 })
 
@@ -132,3 +192,29 @@ collectorRouter.post("/collector/jobs/:id/incomplete", async (req, res) => {
   await events.notCompleted(closed, reason, true)
   res.json({ job: collectorJob(closed) })
 })
+
+type Point = { lat: number; lng: number }
+
+/** Nearest stop next, starting from the collector (or the first pinned job). Unpinned jobs go last. */
+function planRoute<T extends { lat: number | null; lng: number | null; asap: boolean; scheduledDate: Date }>(jobs: T[], start: Point | null) {
+  const pinned = jobs.filter((j) => j.lat !== null && j.lng !== null)
+  const unpinned = jobs.filter((j) => j.lat === null || j.lng === null)
+  const route: { job: T; legKm: number | null }[] = []
+  let here = start
+  const left = [...pinned]
+  while (left.length) {
+    let best = 0
+    if (here) {
+      let bestKm = Infinity
+      left.forEach((j, i) => {
+        const km = distanceKm(here!, { lat: j.lat!, lng: j.lng! })
+        if (km < bestKm) [bestKm, best] = [km, i]
+      })
+    }
+    const [next] = left.splice(best, 1)
+    const at = { lat: next.lat!, lng: next.lng! }
+    route.push({ job: next, legKm: here ? distanceKm(here, at) : null })
+    here = at
+  }
+  return [...route, ...unpinned.map((job) => ({ job, legKm: null }))]
+}

@@ -71,8 +71,14 @@ paymentsRouter.post("/payments", requireUser, requireCustomer, async (req, res) 
   if (body.orderId) {
     const order = await prisma.order.findFirst({ where: { id: body.orderId, userId: user.id } })
     if (!order) throw new HttpError(404, "Order not found.")
-    if (order.status !== "AWAITING_PAYMENT") throw new HttpError(409, "This order doesn't need paying.")
-    target = { purpose: "ORDER", amount: order.amount, orderId: order.id }
+    if (order.status === "AWAITING_PAYMENT") {
+      target = { purpose: "ORDER", amount: order.amount, orderId: order.id }
+    } else if (order.status === "COMPLETED" && order.extraAmount > 0 && !order.extraPaidAt) {
+      // Extra bags the collector found at the pickup.
+      target = { purpose: "ORDER_BALANCE", amount: order.extraAmount, orderId: order.id }
+    } else {
+      throw new HttpError(409, "This order doesn't need paying.")
+    }
   } else {
     const sub = await prisma.subscription.findFirst({ where: { id: body.subscriptionId, userId: user.id } })
     if (!sub) throw new HttpError(404, "Plan not found.")
@@ -101,7 +107,7 @@ paymentsRouter.post("/payments", requireUser, requireCustomer, async (req, res) 
 // Everything the customer has paid: card/online payments, and bank transfers staff confirmed.
 paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) => {
   const userId = currentUser(req).id
-  const [online, transfers] = await Promise.all([
+  const [online, transfers, cash] = await Promise.all([
     prisma.payment.findMany({
       where: { userId, status: "SUCCESS" },
       include: { order: true, subscription: true },
@@ -113,13 +119,20 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
       orderBy: { paidAt: "desc" },
       take: 200,
     }),
+    // Extra bags paid to the collector in cash.
+    prisma.order.findMany({ where: { userId, extraPaymentMethod: "CASH" }, orderBy: { extraPaidAt: "desc" }, take: 200 }),
   ])
-  const PURPOSE = { ORDER: "", SUBSCRIPTION_START: "Plan started", SUBSCRIPTION_RENEWAL: "Plan renewed" }
+  const PURPOSE = { SUBSCRIPTION_START: "Plan started", SUBSCRIPTION_RENEWAL: "Plan renewed" }
+  const describe = (p: (typeof online)[number]) => {
+    if (p.purpose === "ORDER_BALANCE" && p.order) return `Extra bags for ${p.order.reference}`
+    if (p.order) return orderDescription(p.order)
+    return `${PURPOSE[p.purpose as keyof typeof PURPOSE]}: ${findPlan(p.subscription!.plan).name}`
+  }
   const rows = [
     ...online.map((p) => ({
       id: p.id,
       reference: p.order?.reference ?? p.reference,
-      description: p.order ? orderDescription(p.order) : `${PURPOSE[p.purpose]}: ${findPlan(p.subscription!.plan).name}`,
+      description: describe(p),
       amount: p.amount,
       method: p.channel === "bank_transfer" ? "Paystack (transfer)" : p.channel === "ussd" ? "Paystack (USSD)" : "Paystack (card)",
       paidAt: p.paidAt!,
@@ -133,6 +146,16 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
       amount: o.amount,
       method: "Bank transfer",
       paidAt: o.paidAt!,
+      orderId: o.id,
+      subscriptionId: null,
+    })),
+    ...cash.map((o) => ({
+      id: `${o.id}-extra`,
+      reference: o.reference,
+      description: `Extra bags for ${o.reference}`,
+      amount: o.extraAmount,
+      method: "Cash to collector",
+      paidAt: o.extraPaidAt!,
       orderId: o.id,
       subscriptionId: null,
     })),

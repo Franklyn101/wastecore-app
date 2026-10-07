@@ -43,6 +43,7 @@ enum TimeWindow {
 enum PaymentMethod {
   PAYSTACK // verified automatically
   TRANSFER // bank transfer, checked by staff against the uploaded receipt
+  CASH // paid to the collector (only for extra bags found at pickup)
 }
 
 // PENDING_PAYMENT -> ACTIVE -> (renewed, stays ACTIVE) ... -> EXPIRED
@@ -57,6 +58,7 @@ enum SubscriptionStatus {
 
 enum PaymentPurpose {
   ORDER
+  ORDER_BALANCE // extra bags found at an instant pickup
   SUBSCRIPTION_START
   SUBSCRIPTION_RENEWAL
 }
@@ -217,60 +219,89 @@ model Collector {
   approvedAt     DateTime?
   selfRegistered Boolean   @default(false) // created by the collector signing up in the app
   serviceAreaId  String? // the city they work in
+  // Switched on in the collector app while they're working and can take jobs.
+  onDuty         Boolean   @default(false)
+  onDutySince    DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  serviceArea   ServiceArea?   @relation(fields: [serviceAreaId], references: [id], onDelete: SetNull)
+  user          User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  serviceArea   ServiceArea?      @relation(fields: [serviceAreaId], references: [id], onDelete: SetNull)
   orders        Order[]
   subscriptions Subscription[]
+  payouts       CollectorPayout[]
+}
+
+// Money paid to a collector for a batch of completed jobs.
+model CollectorPayout {
+  id          String   @id @default(cuid())
+  collectorId String
+  amount      Int // naira
+  jobs        Int
+  note        String? // e.g. transfer reference
+  paidById    String? // the staff member who recorded it
+  createdAt   DateTime @default(now())
+
+  collector Collector @relation(fields: [collectorId], references: [id], onDelete: Cascade)
+  orders    Order[]
+
+  @@index([collectorId, createdAt])
 }
 
 model Order {
-  id             String         @id @default(cuid())
-  reference      String         @unique // shown to customers, e.g. WC-4F7K2Q
-  userId         String
-  type           OrderType
+  id                 String         @id @default(cuid())
+  reference          String         @unique // shown to customers, e.g. WC-4F7K2Q
+  userId             String
+  type               OrderType
   // Catalog key of what was bought: instant, a plan id, or small/medium/large bags.
-  plan           String
-  address        String
+  plan               String
+  address            String
   // Where exactly, copied from the saved address when booked.
-  landmark       String?
-  lat            Float?
-  lng            Float?
-  areaId         String?
-  wasteType      String?
+  landmark           String?
+  lat                Float?
+  lng                Float?
+  areaId             String?
+  wasteType          String?
   // Pickup date, or (for bags) the order date.
-  scheduledDate  DateTime       @db.Date
-  asap           Boolean        @default(false) // instant pickup requested "as soon as possible"
-  timeWindow     TimeWindow?
-  skippedAt      DateTime? // a plan pickup the customer chose to skip (status CANCELLED)
+  scheduledDate      DateTime       @db.Date
+  asap               Boolean        @default(false) // instant pickup requested "as soon as possible"
+  timeWindow         TimeWindow?
+  skippedAt          DateTime? // a plan pickup the customer chose to skip (status CANCELLED)
   // The customer's rating of a completed pickup or delivery.
-  rating         Int? // 1 to 5
-  ratingComment  String?
-  ratedAt        DateTime?
-  quantity       Int            @default(1) // bags for an instant pickup, packs for a bag order
-  amount         Int // naira due for this order; 0 for plan pickups (paid by the subscription)
-  status         OrderStatus    @default(AWAITING_PAYMENT)
-  paymentMethod  PaymentMethod?
-  receiptUrl     String?
-  paidAt         DateTime?
-  subscriptionId String?
-  collectorId    String?
-  adminNote      String? // staff notes, also shown to the assigned collector (e.g. gate code)
-  customerNote   String? // shown to the customer, e.g. why a receipt was rejected
+  rating             Int? // 1 to 5
+  ratingComment      String?
+  ratedAt            DateTime?
+  quantity           Int            @default(1) // bags for an instant pickup, packs for a bag order
+  amount             Int // naira due for this order; 0 for plan pickups (paid by the subscription)
+  status             OrderStatus    @default(AWAITING_PAYMENT)
+  paymentMethod      PaymentMethod?
+  receiptUrl         String?
+  paidAt             DateTime?
+  subscriptionId     String?
+  collectorId        String?
+  adminNote          String? // staff notes, also shown to the assigned collector (e.g. gate code)
+  customerNote       String? // shown to the customer, e.g. why a receipt was rejected
   // Set by the collector on the job.
-  onTheWayAt     DateTime?
-  completedAt    DateTime?
-  collectorNote  String? // e.g. why a pickup couldn't be completed; shown to the customer
-  proofPhotoUrl  String? // photo taken at pickup or delivery
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  onTheWayAt         DateTime?
+  completedAt        DateTime?
+  collectorNote      String? // e.g. why a pickup couldn't be completed; shown to the customer
+  proofPhotoUrl      String? // photo taken at pickup or delivery
+  // Bags actually collected. For instant pickups, bags beyond what was booked are owed as a balance.
+  bagsCollected      Int?
+  extraAmount        Int            @default(0) // naira owed for the extra bags
+  extraPaidAt        DateTime?
+  extraPaymentMethod PaymentMethod?
+  // What the collector earns for this job, fixed when it is completed; payoutId is set once they're paid.
+  collectorPay       Int?
+  payoutId           String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collector    Collector?    @relation(fields: [collectorId], references: [id], onDelete: SetNull)
-  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  area         ServiceArea?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collector    Collector?       @relation(fields: [collectorId], references: [id], onDelete: SetNull)
+  subscription Subscription?    @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  area         ServiceArea?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  payout       CollectorPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
   payments     Payment[]
   tickets      SupportTicket[]
 

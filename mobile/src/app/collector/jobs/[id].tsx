@@ -1,15 +1,17 @@
 import * as ImagePicker from "expo-image-picker"
 import { router, useLocalSearchParams } from "expo-router"
 import { useState } from "react"
-import { Alert, Image, Linking, Platform, StyleSheet, Text, View } from "react-native"
+import { Alert, Image, Linking, Platform, StyleSheet, Switch, Text, View } from "react-native"
 import { jobLoad, JOB_KIND } from "../../../components/JobCard"
 import { MapView } from "../../../components/MapView"
+import { Stepper } from "../../../components/Stepper"
 import { Badge, Button, Card, Chip, ErrorBanner, Loading, Row, Screen, Section, TextField } from "../../../components/ui"
-import { api, type PickedImage } from "../../../lib/api"
+import type { PickedImage } from "../../../lib/api"
+import { useCatalog } from "../../../lib/catalog"
 import { confirmAction } from "../../../lib/dialogs"
-import { formatDate, pickupWhen } from "../../../lib/format"
-import type { CollectorJob } from "../../../lib/types"
+import { formatDate, naira, pickupWhen } from "../../../lib/format"
 import { directionsUrl } from "../../../lib/location"
+import { loadJob, runOrQueue } from "../../../lib/offline"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
 import { colors, font, radius, spacing } from "../../../theme"
@@ -20,20 +22,32 @@ const whatsappUrl = (phone: string) => `https://wa.me/${phone.replace(/^\+/, "")
 
 export default function Job() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const { data, error, refresh, setData } = useFocusData(() => api.collector.job(id))
+  const { data, error, refresh, setData } = useFocusData(() => loadJob(id))
+  const { catalog } = useCatalog()
   const action = useSubmit()
+  const [queued, setQueued] = useState(false)
   const [mode, setMode] = useState<"idle" | "complete" | "incomplete">("idle")
   const [note, setNote] = useState("")
   const [photo, setPhoto] = useState<PickedImage | null>(null)
   const [reason, setReason] = useState("")
+  const [bags, setBags] = useState<number | null>(null)
+  const [cash, setCash] = useState(false)
 
   const job = data?.job
   if (!job) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
 
   const open = job.status === "ASSIGNED"
-  const apply = (fn: () => Promise<{ job: CollectorJob }>) =>
+  const isPickup = job.type !== "WASTE_BAGS"
+  const bagCount = bags ?? job.quantity
+  // Extra bags on a one-off pickup are charged per bag; plans include their pickups.
+  const extra = job.type === "INSTANT_PICKUP" && catalog ? Math.max(0, bagCount - job.quantity) * catalog.instantPickup.pricePerBag : 0
+
+  // Sends the action, or saves it on the phone to send when there's signal.
+  const apply = (step: Parameters<typeof runOrQueue>[1]) =>
     void action.submit(async () => {
-      setData(await fn())
+      const result = await runOrQueue(job, step)
+      setData({ job: result.job, offline: result.queued })
+      setQueued(result.queued)
       setMode("idle")
     })
 
@@ -55,6 +69,14 @@ export default function Job() {
 
   return (
     <Screen refreshing={false} onRefresh={refresh}>
+      {queued || data.offline ? (
+        <Card style={{ backgroundColor: colors.warningSoft, borderColor: colors.warning }}>
+          <Text style={font.label}>{queued ? "Saved on your phone" : "You're offline"}</Text>
+          <Text style={font.muted}>
+            {queued ? "It will be sent to the office automatically when you have signal." : "Showing the last saved copy of this job."}
+          </Text>
+        </Card>
+      ) : null}
       <Card>
         <View style={styles.headerRow}>
           <Text style={font.heading}>{JOB_KIND[job.type]}</Text>
@@ -111,7 +133,7 @@ export default function Job() {
               title="I'm on my way"
               variant="secondary"
               loading={action.busy}
-              onPress={() => apply(() => api.collector.onTheWay(job.id))}
+              onPress={() => apply({ kind: "onTheWay", jobId: job.id })}
             />
           ) : null}
           <Button title={job.type === "WASTE_BAGS" ? "Mark delivered" : "Mark completed"} onPress={() => setMode("complete")} />
@@ -130,11 +152,44 @@ export default function Job() {
             variant="secondary"
             onPress={() => void takePhoto()}
           />
+          {isPickup ? (
+            <Stepper
+              label="Bags collected"
+              hint={`Booked: ${job.quantity}`}
+              value={bagCount}
+              onChange={setBags}
+              max={200}
+              unit="bags"
+            />
+          ) : null}
+          {extra > 0 ? (
+            <View style={{ backgroundColor: colors.warningSoft, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm }}>
+              <Text style={[font.label, { color: colors.warning }]}>
+                {bagCount - job.quantity} extra bag{bagCount - job.quantity === 1 ? "" : "s"}: {naira(extra)}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <Text style={[font.body, { flex: 1 }]}>Customer paid me {naira(extra)} in cash</Text>
+                <Switch accessibilityLabel="Customer paid the extra in cash" value={cash} onValueChange={setCash} trackColor={{ true: colors.primary }} />
+              </View>
+              {!cash ? <Text style={font.muted}>The customer will be asked to pay in the app.</Text> : null}
+            </View>
+          ) : null}
           <TextField label="Note (optional)" value={note} onChangeText={setNote} maxLength={500} placeholder="e.g. Left bags at the gate" />
           <Button
             title="Confirm"
             loading={action.busy}
-            onPress={() => apply(() => api.collector.complete(job.id, { note: note.trim() || undefined, photo }))}
+            onPress={() =>
+              apply({
+                kind: "complete",
+                jobId: job.id,
+                input: {
+                  note: note.trim() || undefined,
+                  photo,
+                  ...(isPickup ? { bags: bagCount } : {}),
+                  ...(extra > 0 && cash ? { extraPaidCash: true } : {}),
+                },
+              })
+            }
           />
           <Button title="Back" variant="secondary" disabled={action.busy} onPress={() => setMode("idle")} />
         </Card>
@@ -157,7 +212,7 @@ export default function Job() {
             disabled={reason.trim().length < 3}
             onPress={() =>
               confirmAction("Close this job?", "It will be marked as not completed.", "Close job", () =>
-                apply(() => api.collector.incomplete(job.id, reason.trim())),
+                apply({ kind: "incomplete", jobId: job.id, reason: reason.trim() }),
               )
             }
           />
@@ -171,6 +226,11 @@ export default function Job() {
             {job.status === "COMPLETED" ? "Completed" : job.status === "INCOMPLETE" ? "Not completed" : "Cancelled by the office"}
           </Text>
           {job.completedAt ? <Row label="Closed" value={formatDate(job.completedAt)} /> : null}
+          {job.bagsCollected !== null ? <Row label="Bags collected" value={String(job.bagsCollected)} /> : null}
+          {job.extraAmount > 0 ? (
+            <Row label="Extra bags" value={`${naira(job.extraAmount)} · ${job.extraPaid ? "paid" : "customer to pay in app"}`} />
+          ) : null}
+          {job.pay !== null ? <Row label="You earn" value={naira(job.pay)} /> : null}
           {job.collectorNote ? <Row label="Your note" value={job.collectorNote} /> : null}
           {job.rating ? <Row label="Customer's rating" value={`${"★".repeat(job.rating)}${"☆".repeat(5 - job.rating)}`} /> : null}
           {job.ratingComment ? <Text style={font.body}>"{job.ratingComment}"</Text> : null}

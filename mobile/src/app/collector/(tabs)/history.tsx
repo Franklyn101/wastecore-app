@@ -1,12 +1,12 @@
 import { Text } from "react-native"
 import { JobCard } from "../../../components/JobCard"
 import { Card, ErrorBanner, Loading, Screen } from "../../../components/ui"
-import { api } from "../../../lib/api"
+import { loadJobs } from "../../../lib/offline"
 import { useFocusData } from "../../../lib/useFocusData"
 import { font } from "../../../theme"
 
 export default function CollectorHistory() {
-  const { data, error, refreshing, refresh } = useFocusData(() => api.collector.jobs())
+  const { data, error, refreshing, refresh } = useFocusData(() => loadJobs())
   if (!data) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
 
   return (

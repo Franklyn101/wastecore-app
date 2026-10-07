@@ -143,6 +143,13 @@ export async function recordPaystackResult(payment: Payment, data: PaystackTrans
     })
     if (claimed.count === 0) return null // already applied
 
+    if (payment.purpose === "ORDER_BALANCE" && payment.orderId) {
+      await tx.order.updateMany({
+        where: { id: payment.orderId, extraPaidAt: null },
+        data: { extraPaidAt: new Date(), extraPaymentMethod: "PAYSTACK" },
+      })
+      return null // nothing more to announce
+    }
     if (payment.purpose === "ORDER" && payment.orderId) {
       const paid = await tx.order.updateMany({
         where: { id: payment.orderId, status: { in: ["AWAITING_PAYMENT", "CANCELLED"] } },

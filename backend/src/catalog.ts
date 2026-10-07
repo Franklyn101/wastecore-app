@@ -115,6 +115,13 @@ export const SUPPORT_CATEGORIES = [
   "Other",
 ] as const
 
+// What collectors earn per completed job, in naira. Change these to match your agreement with drivers.
+export const COLLECTOR_PAY = {
+  pickup: 300, // each pickup (instant or plan)
+  perBag: 50, // plus this for every bag collected
+  bagDelivery: 200, // delivering a pack order
+} as const
+
 // When in the day a pickup happens. Customers may also leave it as "any time".
 export const TIME_WINDOWS = [
   { id: "MORNING", label: "Morning", hours: "8am to 12pm" },

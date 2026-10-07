@@ -129,12 +129,19 @@ export default function ManageOrder() {
       ) : null}
       {order.skippedAt ? <Text style={font.muted}>The customer skipped this plan pickup.</Text> : null}
 
-      {order.onTheWayAt || order.completedAt || order.collectorNote || order.proofPhotoUrl ? (
+      {order.onTheWayAt || order.completedAt || order.collectorNote || order.proofPhotoUrl || order.bagsCollected !== null ? (
         <Section title="From the collector">
           <Card>
             {order.onTheWayAt ? <Row label="On the way" value={formatDateTime(order.onTheWayAt)} /> : null}
             {order.completedAt ? (
               <Row label={order.status === "INCOMPLETE" ? "Closed (not done)" : "Completed"} value={formatDateTime(order.completedAt)} />
+            ) : null}
+            {order.bagsCollected !== null ? <Row label="Bags collected" value={`${order.bagsCollected} (booked ${order.quantity})`} /> : null}
+            {order.extraAmount > 0 ? (
+              <Row
+                label="Extra bags"
+                value={`${naira(order.extraAmount)} · ${order.extraPaidAt ? `paid${order.extraPaymentMethod === "CASH" ? " in cash to collector" : " online"}` : "unpaid"}`}
+              />
             ) : null}
             {order.collectorNote ? <Row label="Note" value={order.collectorNote} /> : null}
             {order.proofPhotoUrl ? (
@@ -263,12 +270,15 @@ function NextStep(p: NextStepProps) {
       ) : (
         // Collectors who work in the order's city first.
         [...p.collectors]
-          .sort((a, b) => Number(b.serviceAreaId === order.areaId) - Number(a.serviceAreaId === order.areaId))
+          .sort(
+            (a, b) =>
+              Number(b.serviceAreaId === order.areaId) - Number(a.serviceAreaId === order.areaId) || Number(b.onDuty) - Number(a.onDuty),
+          )
           .map((c) => (
           <OptionCard
             key={c.id}
             title={c.name}
-            subtitle={`${c.area} · ${c.phone}`}
+            subtitle={`${c.onDuty ? "On duty · " : ""}${c.area} · ${c.phone}`}
             selected={p.collectorId === c.id}
             onPress={() => p.setCollectorId(c.id)}
           />

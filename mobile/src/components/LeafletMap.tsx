@@ -9,6 +9,7 @@ import type { DOMProps } from "expo/dom"
 
 type Point = { lat: number; lng: number }
 export type MapCircle = Point & { radiusKm: number; active: boolean; label: string }
+export type MapMarker = Point & { label: string; title?: string }
 
 type Props = {
   center: Point
@@ -20,6 +21,10 @@ type Props = {
   pin?: Point | null
   /** Service areas to outline. */
   circles?: MapCircle[]
+  /** Numbered stops (e.g. a route). The map zooms to fit them, and the start point if given. */
+  markers?: MapMarker[]
+  /** Where the route starts (the collector), shown as a dot. */
+  start?: Point | null
   /** Picker mode: called with the spot under the pin when the map stops moving. */
   onMove?: (point: Point) => Promise<void>
   dom?: DOMProps
@@ -36,7 +41,16 @@ const pinIcon = L.divIcon({
     <circle cx="16" cy="15.5" r="6" fill="#fff"/></svg>`,
 })
 
-export default function LeafletMap({ center, zoom, height, picker, pin, circles = [], onMove }: Props) {
+const stopIcon = (label: string) =>
+  L.divIcon({
+    className: "",
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    html: `<div style="width:28px;height:28px;border-radius:14px;background:${GREEN};color:#fff;border:2px solid #fff;
+      box-shadow:0 1px 4px rgba(0,0,0,.4);font:700 13px/24px sans-serif;text-align:center">${label}</div>`,
+  })
+
+export default function LeafletMap({ center, zoom, height, picker, pin, circles = [], markers = [], start, onMove }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const layers = useRef<L.LayerGroup | null>(null)
@@ -92,7 +106,17 @@ export default function LeafletMap({ center, zoom, height, picker, pin, circles 
         .addTo(group)
     }
     if (pin && !picker) L.marker([pin.lat, pin.lng], { icon: pinIcon }).addTo(group)
-  }, [circles, pin, picker])
+    for (const m of markers) {
+      const marker = L.marker([m.lat, m.lng], { icon: stopIcon(m.label) }).addTo(group)
+      if (m.title) marker.bindTooltip(m.title)
+    }
+    if (start) L.circleMarker([start.lat, start.lng], { radius: 8, color: "#fff", weight: 3, fillColor: "#1F5FAD", fillOpacity: 1 }).addTo(group)
+    if (markers.length > 1 && map.current) {
+      const route = [...(start ? [[start.lat, start.lng] as [number, number]] : []), ...markers.map((m) => [m.lat, m.lng] as [number, number])]
+      L.polyline(route, { color: GREEN, weight: 3, opacity: 0.6, dashArray: "4 8" }).addTo(group)
+      map.current.fitBounds(L.latLngBounds(route), { padding: [30, 30] })
+    }
+  }, [circles, pin, picker, markers, start])
 
   return (
     <div style={{ position: "relative", width: "100%", height, borderRadius: 12, overflow: "hidden" }}>

@@ -123,6 +123,31 @@ export default function OrderDetails() {
         ) : null}
       </Card>
 
+      {current.extraAmount > 0 ? (
+        <Card style={current.extraPaidAt ? undefined : { backgroundColor: colors.warningSoft, borderColor: colors.warning }}>
+          <Text style={font.heading}>Extra bags</Text>
+          <Text style={font.body}>
+            Your collector took {current.bagsCollected} bags; you booked {current.quantity}.{" "}
+            {current.extraPaidAt
+              ? `${naira(current.extraAmount)} paid${current.extraPaymentMethod === "CASH" ? " in cash" : ""}. Thank you!`
+              : `Please pay ${naira(current.extraAmount)} for the extra bags.`}
+          </Text>
+          {!current.extraPaidAt && online ? (
+            <PayButton
+              amount={current.extraAmount}
+              target={{ orderId: current.id }}
+              onPaid={() => void api.order(current.id).then((r) => setOrder(r.order))}
+            />
+          ) : null}
+          {!current.extraPaidAt && !online && catalog ? (
+            <Text style={font.muted}>
+              Transfer to {catalog.bank.bankName} {catalog.bank.accountNumber} ({catalog.bank.accountName}) with {current.reference} as the
+              narration, then contact support.
+            </Text>
+          ) : null}
+        </Card>
+      ) : null}
+
       <RateOrder order={current} onRated={setOrder} />
 
       {current.collectorNote || current.proofPhotoUrl ? (
@@ -216,6 +241,9 @@ export default function OrderDetails() {
         />
         {current.type === "WASTE_BAGS" ? <Row label="Packs" value={String(current.quantity)} /> : null}
         {current.type === "INSTANT_PICKUP" ? <Row label="Bags" value={String(current.quantity)} /> : null}
+        {current.bagsCollected !== null && current.bagsCollected !== current.quantity ? (
+          <Row label="Bags collected" value={String(current.bagsCollected)} />
+        ) : null}
         {current.wasteType ? <Row label="Waste type" value={current.wasteType} /> : null}
         <Row
           label={current.type === "WASTE_BAGS" ? "Ordered" : "Pickup"}
