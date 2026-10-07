@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store"
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Platform } from "react-native"
 import { api, setAuthToken, setUnauthorizedHandler, type AuthResponse } from "./api"
+import { unregisterPush } from "./push"
 import type { User } from "./types"
 
 const TOKEN_KEY = "wastecore.token"
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const signOut = useCallback(async () => {
+    await unregisterPush() // while still signed in, so the server accepts it
     setAuthToken(null)
     setUser(null)
     await tokenStore.clear()

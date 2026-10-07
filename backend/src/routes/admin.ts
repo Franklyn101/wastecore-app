@@ -3,11 +3,12 @@ import { Router } from "express"
 import { z } from "zod"
 import { requireAdmin, requireUser } from "../auth.ts"
 import { prisma } from "../db.ts"
-import type { Prisma } from "../generated/prisma/client.ts"
+import type { Order, Prisma } from "../generated/prisma/client.ts"
 import { OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "../generated/prisma/enums.ts"
 import { HttpError } from "../http.ts"
 import { adminCollector, adminOrder, adminSubscription, ticket } from "../serializers.ts"
 import { today } from "../dates.ts"
+import { events } from "../events.ts"
 import { phoneSchema, trimmed } from "../validation.ts"
 
 // Operations API for staff: verify payments, assign collectors, close tickets.
@@ -143,8 +144,30 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
   // Conditional on the status we checked, so two staff acting at once can't both win.
   const updated = await prisma.order.updateMany({ where: { id: order.id, status: order.status }, data })
   if (updated.count === 0) throw new HttpError(409, "This order was just changed by someone else. Refresh and try again.")
-  res.json({ order: adminOrder(await findOrder(order.id)) })
+  const after = await findOrder(order.id)
+  await announceOrderChange(order, after)
+  res.json({ order: adminOrder(after) })
 })
+
+/** Tells the customer and collectors what a staff change to an order means for them. */
+async function announceOrderChange(before: Order, after: Order) {
+  const moved = before.status !== after.status
+  if (moved && before.status === "PENDING" && after.status === "AWAITING_PAYMENT") {
+    await events.receiptRejected(after, after.customerNote ?? "Please upload a new receipt.")
+  }
+  if (moved && before.status === "AWAITING_PAYMENT" && after.status === "PENDING") await events.paymentConfirmed(after)
+
+  const newCollector = after.collectorId !== before.collectorId
+  if (after.status === "ASSIGNED" && (moved || newCollector)) {
+    const transferJustChecked = before.status === "PENDING" && after.paymentMethod === "TRANSFER"
+    await events.collectorAssigned(after, transferJustChecked)
+  }
+  if (newCollector && before.collectorId && before.status === "ASSIGNED") await events.jobTakenAway(after, before.collectorId)
+
+  if (moved && after.status === "COMPLETED") await events.completed(after)
+  if (moved && after.status === "INCOMPLETE") await events.notCompleted(after, "We couldn't complete it this time", false)
+  if (moved && after.status === "CANCELLED") await events.cancelledByStaff({ ...after, collectorId: before.collectorId })
+}
 
 adminRouter.get("/admin/subscriptions", async (req, res) => {
   const { status } = z.object({ status: z.enum(SubscriptionStatus).optional() }).parse(req.query)
@@ -179,6 +202,7 @@ adminRouter.patch("/admin/subscriptions/:id", async (req, res) => {
       include: { collector: true, user: { select: { id: true, name: true, phone: true } } },
     })
   })
+  if (collectorId && collectorId !== sub.collectorId) await events.planCollectorSet(updated, updated.user.name)
   res.json({ subscription: adminSubscription(updated) })
 })
 
@@ -229,6 +253,7 @@ adminRouter.post("/admin/collectors/:id/approve", async (req, res) => {
     where: { id: collector.id },
     data: { approvedAt: collector.approvedAt ?? new Date(), active: true },
   })
+  if (!collector.approvedAt && approved.userId) await events.collectorApproved(approved.userId)
   res.json({ collector: adminCollector(approved) })
 })
 
@@ -293,5 +318,7 @@ adminRouter.patch("/admin/support-tickets/:id", async (req, res) => {
   const { status } = z.object({ status: z.enum(TicketStatus) }).parse(req.body)
   const existing = await prisma.supportTicket.findUnique({ where: { id: req.params.id } })
   if (!existing) throw new HttpError(404, "Ticket not found.")
-  res.json({ ticket: ticket(await prisma.supportTicket.update({ where: { id: existing.id }, data: { status } })) })
+  const updated = await prisma.supportTicket.update({ where: { id: existing.id }, data: { status } })
+  if (status !== existing.status) await events.ticketUpdated(existing.userId, existing.reference, status)
+  res.json({ ticket: ticket(updated) })
 })

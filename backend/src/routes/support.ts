@@ -3,6 +3,7 @@ import { z } from "zod"
 import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { SUPPORT_CATEGORIES } from "../catalog.ts"
 import { prisma } from "../db.ts"
+import { events } from "../events.ts"
 import { withUniqueReference } from "../references.ts"
 import { ticket } from "../serializers.ts"
 import { trimmed } from "../validation.ts"
@@ -21,6 +22,7 @@ supportRouter.post("/support-tickets", async (req, res) => {
   const created = await withUniqueReference("TKT", (reference) =>
     prisma.supportTicket.create({ data: { ...body, reference, userId: currentUser(req).id } }),
   )
+  await events.ticketCreated(created.reference, created.category, currentUser(req).name)
   res.status(201).json({ ticket: ticket(created) })
 })
 

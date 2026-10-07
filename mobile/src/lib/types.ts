@@ -165,3 +165,12 @@ export type CollectorJobs = {
   history: CollectorJob[]
   stats: { doneToday: number; doneThisWeek: number }
 }
+
+export type AppNotification = {
+  id: string
+  title: string
+  body: string
+  url: string | null
+  read: boolean
+  createdAt: string
+}

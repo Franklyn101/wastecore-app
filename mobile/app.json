@@ -33,7 +33,13 @@
           "cameraPermission": "WasteCore needs camera access so you can photograph payment receipts."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#167A3E"
+        }
+      ]
     ],
     "scheme": "wastecore"
   }

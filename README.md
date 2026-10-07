@@ -57,6 +57,23 @@ Deactivating a collector, or removing their login, stops them signing in.
 
 Collectors only see jobs assigned to them, and never see prices or payment details. The customer sees the collector's note, the photo, and the reason if a pickup couldn't be done. Staff see all of it on the order, with times.
 
+## Notifications
+
+Customers, collectors and staff get **push notifications** on their phones, and every alert is also kept in the app's notification list (the bell at the top right, with an unread count). Tapping one opens the order, job or plan it's about.
+
+| Who | Is told when |
+| --- | --- |
+| **Customer** | Payment received or confirmed · receipt not accepted (with the reason) · collector assigned · collector on the way · pickup completed or not completed · order cancelled · plan started, renewed, renewal failed, ending in 3 days (if it won't renew), ended · support ticket updated |
+| **Collector** | New job (or new ASAP job) · job reassigned or cancelled · made a plan's regular collector · application approved |
+| **Staff** | New paid order · receipt to check · job a collector couldn't complete · new support ticket · new collector application |
+
+Pushes go through Expo's push service. They need:
+1. **An EAS project id** in the app. Run `npx eas-cli@latest init` in `mobile/`, which adds it to `app.json`.
+2. **A development or store build of the app.** Expo Go can't receive remote push on Android, so build with `npx eas-cli@latest build --profile development`. iOS also needs an Apple Developer account; EAS sets up the push credentials for you.
+3. **For Android, Firebase Cloud Messaging credentials.** Upload them to EAS (`npx eas-cli credentials`).
+
+Without these, the in-app notification list still works everywhere, including the web version. All wording is in `backend/src/events.ts`.
+
 ## Plans and payments
 
 **Subscriptions.** A customer picks a plan, address, waste type and first pickup date, then pays with Paystack. Once paid:
@@ -148,6 +165,9 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | POST | `/orders/:id/receipt` | customer | Multipart `receipt` image (JPEG/PNG/WEBP/HEIC, ≤ 5 MB) |
 | POST | `/orders/:id/cancel` | customer | Cancel an unpaid order |
 | POST / GET | `/support-tickets` | customer | Raise or list support tickets |
+| POST / DELETE | `/me/push-tokens` | any | `{ token, platform }`: register or remove this phone for push |
+| GET | `/notifications` | any | The latest 50 notifications and the unread count |
+| POST | `/notifications/read` | any | `{ ids? }`: mark some, or all, as read |
 | GET / POST | `/subscriptions` | customer | List plans, or sign up `{ plan, address, wasteType, startDate }` (active once paid) |
 | GET | `/subscriptions/:id` | customer | A plan with its upcoming pickups |
 | GET | `/subscriptions/:id/change-quote?plan=` | customer | Credit and amount due to switch plan today |
@@ -201,5 +221,4 @@ Set `EXPO_PUBLIC_API_URL` to the production API URL in your EAS environment.
 ## Next steps
 
 - **Deploy** the API and database, and turn on Cloudinary, so the team can test on real phones.
-- **Push notifications** (Expo Notifications) for "payment confirmed", "receipt rejected", "collector assigned" and "pickup completed", replacing the bot's WhatsApp templates.
 - **Phone number verification** (SMS OTP) at sign-up, and password reset.

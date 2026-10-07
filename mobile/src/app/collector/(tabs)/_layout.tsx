@@ -3,6 +3,7 @@ import { Tabs } from "expo-router/js-tabs"
 import type { ComponentProps } from "react"
 import { Text, View, type ColorValue } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { NotificationsBell } from "../../../components/NotificationsBell"
 import { Button, Card, ErrorBanner, Loading, Screen } from "../../../components/ui"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
@@ -53,6 +54,7 @@ export default function CollectorTabsLayout() {
         tabBarInactiveTintColor: colors.textMuted,
         headerTitleStyle: { color: colors.text },
         sceneStyle: { backgroundColor: colors.background },
+        headerRight: () => <NotificationsBell />,
       }}
     >
       <Tabs.Screen name="index" options={{ title: "My jobs", tabBarIcon: icon("navigate-outline") }} />

@@ -6,6 +6,7 @@ import { prisma } from "../db.ts"
 import type { OrderType } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
 import { withUniqueReference } from "../references.ts"
+import { events } from "../events.ts"
 import { customerOrder } from "../serializers.ts"
 import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
 import { addDays, toDay, ymd } from "../dates.ts"
@@ -131,6 +132,8 @@ ordersRouter.post("/orders/:id/receipt", imageUpload.single("receipt"), async (r
     data: { receiptUrl, status: "PENDING", paymentMethod: "TRANSFER", paidAt: new Date(), customerNote: null },
   })
   if (updated.count === 0) throw new HttpError(409, "This order can no longer take a receipt.")
+  // Staff only need telling about the first receipt; a replacement shows on the same order.
+  if (order.status === "AWAITING_PAYMENT") await events.receiptUploaded(order)
   res.json({ order: customerOrder(await findOwnOrder(order.id, order.userId)) })
 })
 

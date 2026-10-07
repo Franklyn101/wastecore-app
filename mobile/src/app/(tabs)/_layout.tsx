@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { Tabs } from "expo-router/js-tabs"
 import type { ComponentProps } from "react"
 import type { ColorValue } from "react-native"
+import { NotificationsBell } from "../../components/NotificationsBell"
 import { colors } from "../../theme"
 
 type IconName = ComponentProps<typeof Ionicons>["name"]
@@ -18,6 +19,7 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.textMuted,
         headerTitleStyle: { color: colors.text },
         sceneStyle: { backgroundColor: colors.background },
+        headerRight: () => <NotificationsBell />,
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: icon("home-outline") }} />

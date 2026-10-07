@@ -5,6 +5,7 @@ import { addDays, startOfLagosDay, today } from "../dates.ts"
 import { prisma } from "../db.ts"
 import type { Collector } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
+import { events } from "../events.ts"
 import { collectorJob } from "../serializers.ts"
 import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
 
@@ -85,10 +86,11 @@ collectorRouter.get("/collector/jobs/:id", async (req, res) => {
 collectorRouter.post("/collector/jobs/:id/on-the-way", async (req, res) => {
   const collector = currentCollector(req)
   const job = await openJob(req.params.id, collector)
-  await prisma.order.updateMany({
-    where: { id: job.id, collectorId: collector.id, status: "ASSIGNED" },
+  const marked = await prisma.order.updateMany({
+    where: { id: job.id, collectorId: collector.id, status: "ASSIGNED", onTheWayAt: null },
     data: { onTheWayAt: new Date() },
   })
+  if (marked.count) await events.onTheWay(job)
   res.json({ job: collectorJob(await prisma.order.findUniqueOrThrow({ where: { id: job.id }, include: jobInclude })) })
 })
 
@@ -104,6 +106,7 @@ collectorRouter.post("/collector/jobs/:id/complete", imageUpload.single("proof")
     proofPhotoUrl = await saveImage(req.file, job.reference, "proof")
   }
   const done = await close(job.id, collector, { status: "COMPLETED", collectorNote: note || null, proofPhotoUrl })
+  await events.completed(done)
   res.json({ job: collectorJob(done) })
 })
 
@@ -115,5 +118,6 @@ collectorRouter.post("/collector/jobs/:id/incomplete", async (req, res) => {
     .parse(req.body)
   const job = await openJob(req.params.id, collector)
   const closed = await close(job.id, collector, { status: "INCOMPLETE", collectorNote: reason })
+  await events.notCompleted(closed, reason, true)
   res.json({ job: collectorJob(closed) })
 })

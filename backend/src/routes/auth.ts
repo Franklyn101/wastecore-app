@@ -5,6 +5,7 @@ import { z } from "zod"
 import { currentUser, publicUser, requireUser, signToken } from "../auth.ts"
 import { config } from "../config.ts"
 import { prisma } from "../db.ts"
+import { events } from "../events.ts"
 import { HttpError } from "../http.ts"
 import { phoneSchema, trimmed } from "../validation.ts"
 
@@ -90,6 +91,7 @@ authRouter.post("/auth/register-collector", authLimiter, async (req, res) => {
     }
     return user
   })
+  await events.collectorApplied(body.name, body.area)
   res.status(201).json({ token: signToken(user), user: publicUser(user) })
 })
 

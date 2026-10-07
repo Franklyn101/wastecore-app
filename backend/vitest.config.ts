@@ -11,6 +11,7 @@ export default defineConfig({
       JWT_SECRET: "test-secret-test-secret-test-secret-1234",
       RUN_JOBS: "false",
       AUTH_RATE_LIMIT: "10000",
+      EXPO_PUSH_URL: "http://127.0.0.1:4598/push",
       PAYSTACK_SECRET_KEY: "sk_test_fake_key_for_tests",
       PAYSTACK_BASE_URL: "http://127.0.0.1:4599",
     },

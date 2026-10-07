@@ -6,6 +6,7 @@ import { adminRouter } from "./routes/admin.ts"
 import { authRouter } from "./routes/auth.ts"
 import { catalogRouter } from "./routes/catalog.ts"
 import { collectorRouter } from "./routes/collector.ts"
+import { notificationsRouter } from "./routes/notifications.ts"
 import { ordersRouter } from "./routes/orders.ts"
 import { paymentsRouter, paystackWebhook } from "./routes/payments.ts"
 import { subscriptionsRouter } from "./routes/subscriptions.ts"
@@ -26,7 +27,7 @@ export function createApp() {
   })
   app.use("/uploads", express.static(UPLOAD_DIR, { fallthrough: false, index: false }))
 
-  app.use(authRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, collectorRouter)
+  app.use(authRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, collectorRouter, notificationsRouter)
 
   app.use((_req, _res, next) => next(new HttpError(404, "Not found.")))
   app.use(errorHandler)

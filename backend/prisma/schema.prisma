@@ -83,6 +83,37 @@ model User {
   subscriptions Subscription[]
   payments      Payment[]
   collector     Collector? // set when this login belongs to a collector
+  pushTokens    PushToken[]
+  notifications Notification[]
+}
+
+// An Expo push token for one of the user's devices.
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique // ExponentPushToken[...]
+  platform  String // ios or android
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Every alert sent to a user, also shown in the app's notification list.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  url       String? // app screen to open when tapped, e.g. /orders/abc
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model Collector {
@@ -161,6 +192,8 @@ model Subscription {
   cardLabel          String? // e.g. "Visa •••• 4081"
   // Renewal attempts are tracked per period so the saved card is charged at most once.
   lastRenewalAttempt DateTime?          @db.Date
+  // The period end we last sent an "ending soon" reminder for, so it goes out once.
+  reminderSentFor    DateTime?          @db.Date
   // Credit from the plan this one replaces, taken off the first payment.
   credit             Int                @default(0)
   replacesId         String?            @unique

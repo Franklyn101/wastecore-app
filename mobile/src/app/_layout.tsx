@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar"
 import { Loading } from "../components/ui"
 import { AuthProvider, useAuth } from "../lib/auth"
 import { CatalogProvider } from "../lib/catalog"
+import { NotificationsProvider } from "../lib/notifications"
 import { colors } from "../theme"
 
 function RootNavigator() {
@@ -48,6 +49,9 @@ function RootNavigator() {
         <Stack.Screen name="collector/(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="collector/jobs/[id]" options={{ title: "Job" }} />
       </Stack.Protected>
+      <Stack.Protected guard={!!user}>
+        <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
+      </Stack.Protected>
     </Stack>
   )
 }
@@ -56,8 +60,10 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <CatalogProvider>
-        <StatusBar style="dark" />
-        <RootNavigator />
+        <NotificationsProvider>
+          <StatusBar style="dark" />
+          <RootNavigator />
+        </NotificationsProvider>
       </CatalogProvider>
     </AuthProvider>
   )

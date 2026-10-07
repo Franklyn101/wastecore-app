@@ -31,6 +31,10 @@ export const config = {
     .split(",")
     .map((u) => u.trim())
     .filter(Boolean),
+  // Expo push service. An access token is only needed if you turn on
+  // "Enhanced security for push notifications" in your Expo account.
+  expoPushUrl: process.env.EXPO_PUSH_URL?.trim() || "https://exp.host/--/api/v2/push/send",
+  expoAccessToken: process.env.EXPO_ACCESS_TOKEN?.trim() || "",
   // Sign-in and sign-up attempts allowed per IP address every 15 minutes.
   authRateLimit: Number(process.env.AUTH_RATE_LIMIT) || 20,
   // Background billing (renewals and expiry). Off in tests.

@@ -6,12 +6,16 @@ import { prisma } from "./db.ts"
 import type { Payment, Prisma, Subscription } from "./generated/prisma/client.ts"
 import { HttpError } from "./http.ts"
 import { cardLabel, chargeAuthorization, type PaystackTransaction } from "./paystack.ts"
+import { events } from "./events.ts"
 import { newReference } from "./references.ts"
 
 type Tx = Prisma.TransactionClient
 
 /** Renewal can be paid this many days before the current period ends. */
 export const RENEW_WINDOW_DAYS = 7
+
+/** Customers whose plan won't renew automatically are reminded this many days before it ends. */
+const REMINDER_DAYS = 3
 
 export function paymentReference(): string {
   return `WCP-${Date.now().toString(36).toUpperCase()}-${randomInt(36 ** 4).toString(36).toUpperCase().padStart(4, "0")}`
@@ -57,11 +61,11 @@ function savedCard(data: PaystackTransaction): Prisma.SubscriptionUpdateInput {
   return { authorizationCode: auth.authorization_code, cardLabel: cardLabel(auth) }
 }
 
-async function activateSubscription(tx: Tx, sub: Subscription, data: PaystackTransaction) {
+async function activateSubscription(tx: Tx, sub: Subscription, data: PaystackTransaction): Promise<boolean> {
   if (sub.status !== "PENDING_PAYMENT") {
     // e.g. paid from an old checkout tab after starting a different plan. Staff must refund.
     console.warn(`Payment for subscription ${sub.id} arrived while it was ${sub.status}; refund needed.`)
-    return
+    return false
   }
   const plan = findPlan(sub.plan)
   const start = maxDay(sub.startDate, today())
@@ -89,12 +93,13 @@ async function activateSubscription(tx: Tx, sub: Subscription, data: PaystackTra
     },
   })
   await createPlanPickups(tx, active, start, end)
+  return true
 }
 
-async function renewSubscription(tx: Tx, sub: Subscription, data: PaystackTransaction) {
+async function renewSubscription(tx: Tx, sub: Subscription, data: PaystackTransaction): Promise<boolean> {
   if (sub.status !== "ACTIVE" && sub.status !== "EXPIRED") {
     console.warn(`Renewal payment for subscription ${sub.id} arrived while it was ${sub.status}; refund needed.`)
-    return
+    return false
   }
   const plan = findPlan(sub.plan)
   // Renewing early continues from the current end; renewing after expiry starts today.
@@ -105,6 +110,7 @@ async function renewSubscription(tx: Tx, sub: Subscription, data: PaystackTransa
     data: { status: "ACTIVE", currentPeriodStart: start, currentPeriodEnd: end, ...savedCard(data) },
   })
   await createPlanPickups(tx, renewed, start, end)
+  return true
 }
 
 /**
@@ -125,25 +131,33 @@ export async function recordPaystackResult(payment: Payment, data: PaystackTrans
     return
   }
 
-  await prisma.$transaction(async (tx) => {
+  const applied = await prisma.$transaction(async (tx) => {
     const claimed = await tx.payment.updateMany({
       where: { id: payment.id, status: { not: "SUCCESS" } },
       data: { status: "SUCCESS", channel: data.channel, paidAt: data.paid_at ? new Date(data.paid_at) : new Date() },
     })
-    if (claimed.count === 0) return // already applied
+    if (claimed.count === 0) return null // already applied
 
     if (payment.purpose === "ORDER" && payment.orderId) {
-      await tx.order.updateMany({
+      const paid = await tx.order.updateMany({
         where: { id: payment.orderId, status: { in: ["AWAITING_PAYMENT", "CANCELLED"] } },
         data: { status: "PENDING", paymentMethod: "PAYSTACK", paidAt: new Date(), customerNote: null },
       })
-      return
+      return paid.count ? "order" : null
     }
     const sub = payment.subscriptionId ? await tx.subscription.findUnique({ where: { id: payment.subscriptionId } }) : null
-    if (!sub) return
-    if (payment.purpose === "SUBSCRIPTION_START") await activateSubscription(tx, sub, data)
-    else await renewSubscription(tx, sub, data)
+    if (!sub) return null
+    if (payment.purpose === "SUBSCRIPTION_START") return (await activateSubscription(tx, sub, data)) ? "activated" : null
+    return (await renewSubscription(tx, sub, data)) ? "renewed" : null
   })
+
+  // Tell people once the payment is safely recorded.
+  if (applied === "order") {
+    await events.orderPaidOnline(await prisma.order.findUniqueOrThrow({ where: { id: payment.orderId! } }))
+  } else if (applied) {
+    const sub = await prisma.subscription.findUniqueOrThrow({ where: { id: payment.subscriptionId! } })
+    await (applied === "activated" ? events.planActivated(sub) : events.planRenewed(sub))
+  }
 }
 
 /** What switching an active plan to `planId` would cost today, after credit for unused days. */
@@ -231,17 +245,43 @@ export async function runBillingJobs() {
         metadata: { paymentId: payment.id, purpose: payment.purpose },
       })
       await recordPaystackResult(payment, result)
+      if (result.status === "failed") await events.renewalFailed(sub)
     } catch (err) {
       console.error(`Automatic renewal failed for subscription ${sub.id}:`, err)
       await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED" } })
+      await events.renewalFailed(sub)
     }
   }
 
-  // 2. Expire plans whose period has ended without a renewal.
-  await prisma.subscription.updateMany({
-    where: { status: "ACTIVE", currentPeriodEnd: { lte: day } },
-    data: { status: "EXPIRED" },
+  // 2. Remind customers whose plan won't renew that it ends within 3 days, once per period.
+  const ending = await prisma.subscription.findMany({
+    where: {
+      status: "ACTIVE",
+      currentPeriodEnd: { gt: day, lte: addDays(day, REMINDER_DAYS) },
+      OR: [{ autoRenew: false }, { authorizationCode: null }],
+    },
   })
+  for (const sub of ending) {
+    if (sub.reminderSentFor?.getTime() === sub.currentPeriodEnd!.getTime()) continue
+    const claimed = await prisma.subscription.updateMany({
+      where: { id: sub.id, currentPeriodEnd: sub.currentPeriodEnd },
+      data: { reminderSentFor: sub.currentPeriodEnd },
+    })
+    if (claimed.count) await events.planEndingSoon(sub)
+  }
+
+  // 3. Expire plans whose period has ended without a renewal.
+  const expiring = await prisma.subscription.findMany({
+    where: { status: "ACTIVE", currentPeriodEnd: { lte: day } },
+    select: { id: true, userId: true, plan: true },
+  })
+  for (const sub of expiring) {
+    const expired = await prisma.subscription.updateMany({
+      where: { id: sub.id, status: "ACTIVE", currentPeriodEnd: { lte: day } },
+      data: { status: "EXPIRED" },
+    })
+    if (expired.count) await events.planExpired(sub.userId, sub.plan)
+  }
 }
 
 export function startBillingJobs() {

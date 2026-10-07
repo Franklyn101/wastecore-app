@@ -1,6 +1,7 @@
 import { Platform } from "react-native"
 import type {
   AdminOrder,
+  AppNotification,
   AdminSubscription,
   AdminSummary,
   AdminTicket,
@@ -102,6 +103,13 @@ export const api = {
   updateProfile: (body: { name?: string; address?: string; email?: string }) => patch<{ user: User }>("/me", body),
 
   catalog: () => request<Catalog>("/catalog"),
+
+  registerPushToken: (token: string, platform: "ios" | "android") =>
+    post<void>("/me/push-tokens", { token, platform }),
+  removePushToken: (token: string) =>
+    request<void>("/me/push-tokens", { method: "DELETE", body: JSON.stringify({ token }) }),
+  notifications: () => request<{ notifications: AppNotification[]; unread: number }>("/notifications"),
+  markNotificationsRead: (ids?: string[]) => post<void>("/notifications/read", ids ? { ids } : {}),
 
   createOrder: (body: NewOrder) => post<{ order: Order }>("/orders", body),
   orders: () => request<{ orders: Order[] }>("/orders"),
