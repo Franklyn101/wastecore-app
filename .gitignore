@@ -1,2 +1,4 @@
 node_modules/
+# Local settings, e.g. WASTECORE_HOST for testing on a phone
+.env
 .DS_Store

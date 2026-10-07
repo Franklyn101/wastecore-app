@@ -88,7 +88,8 @@ export function startMockPaystack(port = 4599): Promise<MockPaystack> {
         status: true,
         message: "Authorization URL created",
         data: {
-          authorization_url: `http://localhost:${port}/checkout/${encodeURIComponent(body.reference)}`,
+          // CHECKOUT_PUBLIC_URL lets a phone on the same Wi-Fi open the checkout (e.g. http://192.168.1.20:4599).
+          authorization_url: `${(process.env.CHECKOUT_PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, "")}/checkout/${encodeURIComponent(body.reference)}`,
           access_code: `ac_${body.reference}`,
           reference: body.reference,
         },

@@ -203,7 +203,7 @@ describe("dashboard and exports", () => {
   it("summarises the day and exports CSV", async () => {
     const ada = await register("08031112222")
     const staff = await register("08090000001", "ADMIN")
-    const order = await request(app).post("/orders").set(ada).send(pickup({ asap: true, bags: 2 }))
+    const order = await request(app).post("/orders").set(ada).send(pickup({ pickupDate: inDays(0), bags: 2 }))
     await payOnline(ada, order.body.order.id)
 
     const dash = (await request(app).get("/admin/dashboard").set(staff)).body

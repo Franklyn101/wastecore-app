@@ -8,6 +8,9 @@
 #   Emails              http://localhost:8025
 #   API                 http://localhost:4000
 #
+# To try it on a phone with Expo Go, put your computer's Wi-Fi address in a file named .env
+# next to this one (WASTECORE_HOST=192.168.1.20) before starting. See "On a phone" in the README.
+#
 # Payments go to a stand-in Paystack checkout (no real money); texts and emails are caught
 # locally and never sent. Demo logins are listed in the README.
 # This setup is for testing only: its passwords and keys are public. Don't deploy it as is.
@@ -37,9 +40,10 @@ services:
     environment:
       DATABASE_URL: postgresql://wastecore:wastecore@db:5432/wastecore
       JWT_SECRET: local-testing-only-secret-0123456789abcdef
-      PUBLIC_URL: http://localhost:4000
+      # Links in the app (photos, the payment page) use this address, so phones can open them too.
+      PUBLIC_URL: http://${WASTECORE_HOST:-localhost}:4000
       # The app is opened at localhost:8081 in a browser, or through Expo Go on a phone.
-      APP_RETURN_URLS: http://localhost:8081/,exp://,exps://,wastecore://
+      APP_RETURN_URLS: http://localhost:8081/,http://${WASTECORE_HOST:-localhost}:8081/,exp://,exps://,wastecore://
       PAYSTACK_SECRET_KEY: sk_test_local
       PAYSTACK_BASE_URL: http://paystack:4599
       TERMII_API_KEY: local
@@ -64,6 +68,7 @@ services:
     command: npx tsx scripts/paystack-mock.ts
     environment:
       PORT: "4599"
+      CHECKOUT_PUBLIC_URL: http://${WASTECORE_HOST:-localhost}:4599
     ports:
       - "4599:4599"
 

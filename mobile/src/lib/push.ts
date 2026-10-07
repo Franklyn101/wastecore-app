@@ -1,4 +1,4 @@
-import Constants from "expo-constants"
+import Constants, { ExecutionEnvironment } from "expo-constants"
 import * as Device from "expo-device"
 import * as Notifications from "expo-notifications"
 import { router } from "expo-router"
@@ -26,6 +26,8 @@ let registeredToken: string | null = null
  */
 export async function registerForPush(): Promise<void> {
   if (Platform.OS === "web" || !Device.isDevice) return
+  // Expo Go can't receive push notifications; a real build (EAS) can. The bell still works.
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {

@@ -4,6 +4,7 @@ import { createApp } from "../src/app.ts"
 import { recordPaystackResult } from "../src/billing.ts"
 import { prisma } from "../src/db.ts"
 import type { PaystackTransaction } from "../src/paystack.ts"
+import { todayInLagos } from "../src/validation.ts"
 import { resetDatabase, verifyPhone, YENAGOA } from "./helpers.ts"
 
 const app = createApp()
@@ -37,7 +38,7 @@ async function setup(count = 1) {
     const o = await request(app)
       .post("/orders")
       .set(customer)
-      .send({ type: "INSTANT_PICKUP", ...spot, address: `Stop ${i}`, wasteType: "Mixed", bags: 2, asap: true })
+      .send({ type: "INSTANT_PICKUP", ...spot, address: `Stop ${i}`, wasteType: "Mixed", bags: 2, pickupDate: todayInLagos() })
     await prisma.order.update({ where: { id: o.body.order.id }, data: { status: "PENDING", paymentMethod: "TRANSFER", paidAt: new Date() } })
     await request(app).patch(`/admin/orders/${o.body.order.id}`).set(staff).send({ collectorId })
     ids.push(o.body.order.id)

@@ -214,12 +214,14 @@ You can also sign up new customers and collectors; their codes appear in the tex
 
 Stop with `Ctrl+C`. `docker compose down -v` also deletes the test data.
 
-**On a phone:**
-1. Keep Docker running.
-2. On your computer, run `cd mobile && npm install && EXPO_PUBLIC_API_URL=http://<your computer's LAN IP>:4000 npx expo start`.
-3. Scan the QR code with Expo Go.
+**On a phone with Expo Go:**
+1. Find your computer's Wi-Fi address (Windows: `ipconfig`, "IPv4 Address"; Mac: System Settings → Wi-Fi → Details), e.g. `192.168.1.20`. Your phone must be on the same Wi-Fi.
+2. Create a file named `.env` in the project folder (next to `docker-compose.yml`) containing `WASTECORE_HOST=192.168.1.20`, then start (or restart) with `docker compose up --build`. Photos and the test payment page then open on the phone too.
+3. Create `mobile/.env.local` containing `EXPO_PUBLIC_API_URL=http://192.168.1.20:4000`.
+4. In a second terminal: `cd mobile`, `npm install`, then `npx expo start --port 8082` (8081 is used by the web version).
+5. Install **Expo Go** from the App Store or Play Store and scan the QR code (iPhone: with the Camera app; Android: from Expo Go).
 
-Paystack checkout won't open on the phone in this setup, because its stand-in runs on your computer's `localhost`. Use bank transfer with a receipt to test payments there.
+If the phone can't connect, allow Node.js and Docker through your computer's firewall on private networks, or run `npx expo start --port 8082 --tunnel` instead. Push notifications need a real build, so in Expo Go use the bell in the app.
 
 This setup is for testing only. Its passwords and keys are public, so don't deploy it as is.
 
