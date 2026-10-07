@@ -3,6 +3,7 @@ import { Tabs } from "expo-router/js-tabs"
 import type { ComponentProps } from "react"
 import { Text, View, type ColorValue } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { useHideTabBar } from "../../../components/AppTabBar"
 import { NotificationsBell } from "../../../components/NotificationsBell"
 import { Button, Card, ErrorBanner, Loading, Screen } from "../../../components/ui"
 import { api } from "../../../lib/api"
@@ -19,6 +20,9 @@ const icon =
 export default function CollectorTabsLayout() {
   const { signOut } = useAuth()
   const { data, error, refreshing, refresh } = useFocusData(() => api.collector.me())
+
+  // No tabs while waiting for approval: there's nothing to see yet.
+  useHideTabBar(data?.collector.status !== "APPROVED")
 
   if (!data) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
 
@@ -49,6 +53,8 @@ export default function CollectorTabsLayout() {
 
   return (
     <Tabs
+      // The app draws one tab bar for every screen (components/AppTabBar).
+      tabBar={() => null}
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,

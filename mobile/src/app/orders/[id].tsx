@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker"
 import { useLocalSearchParams } from "expo-router"
 import { useState } from "react"
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native"
-import { ChangePickup, RateOrder, ReportProblem } from "../../components/OrderActions"
+import { AfterCompletion, ChangePickup, RateOrder, ReportProblem } from "../../components/OrderActions"
 import { PayButton } from "../../components/PayButton"
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen } from "../../components/ui"
 import { api } from "../../lib/api"
@@ -149,6 +149,7 @@ export default function OrderDetails() {
       ) : null}
 
       <RateOrder order={current} onRated={setOrder} />
+      <AfterCompletion order={current} />
 
       {current.collectorNote || current.proofPhotoUrl ? (
         <Card style={current.status === "INCOMPLETE" ? { backgroundColor: colors.dangerSoft, borderColor: colors.danger } : undefined}>

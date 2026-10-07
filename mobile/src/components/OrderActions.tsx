@@ -147,3 +147,26 @@ export function ReportProblem({ order }: { order: Order }) {
     />
   )
 }
+
+/** After a pickup or delivery is done: the obvious things to do next. */
+export function AfterCompletion({ order }: { order: Order }) {
+  if (order.status !== "COMPLETED") return null
+  const again =
+    order.type === "WASTE_BAGS"
+      ? { title: "Order more bags", href: "/book/bags" }
+      : order.type === "PLAN_PICKUP"
+        ? { title: "See my next pickups", href: "/plan" }
+        : order.type === "SPECIAL_PICKUP"
+          ? { title: "Ask for another quote", href: "/quotes/new" }
+          : { title: "Book another pickup", href: "/book/pickup" }
+  return (
+    <Card>
+      <Text style={font.heading}>What's next?</Text>
+      <Button title={again.title} onPress={() => router.push(again.href as never)} />
+      {order.type === "INSTANT_PICKUP" ? (
+        <Button title="Save with a weekly plan" variant="secondary" onPress={() => router.push("/book/plans")} />
+      ) : null}
+      <Button title="Back to home" variant="secondary" onPress={() => router.navigate("/")} />
+    </Card>
+  )
+}

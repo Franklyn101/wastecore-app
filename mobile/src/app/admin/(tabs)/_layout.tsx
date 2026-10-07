@@ -14,6 +14,8 @@ const icon =
 export default function AdminTabsLayout() {
   return (
     <Tabs
+      // The app draws one tab bar for every screen (components/AppTabBar).
+      tabBar={() => null}
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
