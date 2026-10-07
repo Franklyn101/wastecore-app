@@ -6,6 +6,7 @@ import { api } from "../../../lib/api"
 import { confirmAction } from "../../../lib/dialogs"
 import { assignable, formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../../lib/format"
 import type { AdminOrder, Collector } from "../../../lib/types"
+import { directionsUrl } from "../../../lib/location"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
 import { colors, font, radius, spacing } from "../../../theme"
@@ -173,6 +174,12 @@ export default function ManageOrder() {
             value={isBags ? formatDate(order.scheduledDate) : pickupWhen(order)}
           />
           <Row label={isBags ? "Deliver to" : "Address"} value={order.address} />
+          {order.landmark ? <Row label="Landmark" value={order.landmark} /> : null}
+          {order.lat != null && order.lng != null ? (
+            <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(directionsUrl(order))}>
+              <Text style={{ color: colors.primary, fontWeight: "700" }}>Show on map</Text>
+            </Pressable>
+          ) : null}
           <Row label="Amount" value={order.type === "PLAN_PICKUP" ? "Included in plan" : naira(order.amount)} />
           {order.collector ? <Row label="Collector" value={`${order.collector.name} (${order.collector.area})`} /> : null}
           {order.customerNote ? <Row label="Message to customer" value={order.customerNote} /> : null}
@@ -246,7 +253,10 @@ function NextStep(p: NextStepProps) {
       {p.collectors.length === 0 ? (
         <Text style={font.muted}>No active collectors. Add one in the Collectors tab.</Text>
       ) : (
-        p.collectors.map((c) => (
+        // Collectors who work in the order's city first.
+        [...p.collectors]
+          .sort((a, b) => Number(b.serviceAreaId === order.areaId) - Number(a.serviceAreaId === order.areaId))
+          .map((c) => (
           <OptionCard
             key={c.id}
             title={c.name}

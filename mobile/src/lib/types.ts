@@ -21,6 +21,10 @@ export type Order = {
   plan: string
   planLabel: string
   address: string
+  landmark: string | null
+  lat: number | null
+  lng: number | null
+  areaId: string | null
   wasteType: string | null
   scheduledDate: string
   asap: boolean
@@ -52,6 +56,9 @@ export type Subscription = {
   periodLabel: string
   status: SubscriptionStatus
   address: string
+  landmark: string | null
+  lat: number | null
+  lng: number | null
   wasteType: string
   startDate: string
   currentPeriodStart: string | null
@@ -126,6 +133,7 @@ export type Collector = {
   name: string
   phone: string
   area: string
+  serviceAreaId: string | null
   active: boolean
   /** Signed up in the app and waiting for staff approval. */
   pending: boolean
@@ -148,6 +156,9 @@ export type CollectorJob = {
   type: OrderType
   planLabel: string
   address: string
+  landmark: string | null
+  lat: number | null
+  lng: number | null
   wasteType: string | null
   scheduledDate: string
   asap: boolean
@@ -175,3 +186,36 @@ export type AppNotification = {
   read: boolean
   createdAt: string
 }
+
+// Where WasteCore works. Yenagoa (Bayelsa) launches first, then Port Harcourt and Lagos.
+export type ServiceArea = {
+  id: string
+  slug: string
+  name: string
+  state: string
+  centerLat: number
+  centerLng: number
+  radiusKm: number
+  active: boolean
+}
+
+export type AreaCheck = {
+  /** The area the spot is inside, live or not. */
+  area: ServiceArea | null
+  served: boolean
+  nearest: ServiceArea | null
+  nearestKm: number | null
+}
+
+export type SavedAddress = {
+  id: string
+  label: string
+  address: string
+  landmark: string | null
+  lat: number
+  lng: number
+  areaId: string
+  areaName?: string
+}
+
+export type AdminArea = ServiceArea & { savedAddresses: number; waitingCustomers: number; openOrders: number }

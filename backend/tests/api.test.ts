@@ -4,7 +4,7 @@ import { createApp } from "../src/app.ts"
 import { asapDate } from "../src/routes/orders.ts"
 import { prisma } from "../src/db.ts"
 import { normalizePhone, todayInLagos } from "../src/validation.ts"
-import { resetDatabase, verifyPhone } from "./helpers.ts"
+import { resetDatabase, verifyPhone, YENAGOA } from "./helpers.ts"
 
 const app = createApp()
 const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
@@ -72,7 +72,7 @@ describe("orders", () => {
     const created = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "WASTE_BAGS", bagSize: "medium", quantity: 3, address: "12 Allen Avenue, Ikeja", amount: 1 })
+      .send({ type: "WASTE_BAGS", bagSize: "medium", quantity: 3, ...YENAGOA, address: "12 Allen Avenue, Ikeja", amount: 1 })
     expect(created.status).toBe(201)
     expect(created.body.order).toMatchObject({
       status: "AWAITING_PAYMENT",
@@ -100,7 +100,7 @@ describe("orders", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "INSTANT_PICKUP", address: "Lekki", wasteType: "Plastic", pickupDate: tomorrow })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Lekki", wasteType: "Plastic", pickupDate: tomorrow })
     const res = await request(app)
       .post(`/orders/${body.order.id}/receipt`)
       .set(auth)
@@ -113,21 +113,21 @@ describe("orders", () => {
     const past = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "INSTANT_PICKUP", address: "Lekki", wasteType: "Plastic", pickupDate: "2020-01-01" })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Lekki", wasteType: "Plastic", pickupDate: "2020-01-01" })
     expect(past.status).toBe(400)
     expect(past.body.error).toMatch(/later date/)
 
     const badPlan = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "WASTE_BAGS", bagSize: "huge", quantity: 1, address: "Lekki" })
+      .send({ type: "WASTE_BAGS", bagSize: "huge", quantity: 1, ...YENAGOA, address: "Lekki" })
     expect(badPlan.status).toBe(400)
 
     // Plans are subscriptions now, not one-off orders.
     const plan = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "WEEKLY_PICKUP", plan: "weekly_2", address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
+      .send({ type: "WEEKLY_PICKUP", plan: "weekly_2", ...YENAGOA, address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
     expect(plan.status).toBe(400)
   })
 
@@ -137,7 +137,7 @@ describe("orders", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(ada)
-      .send({ type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
     expect(body.order.amount).toBe(700) // 1 bag by default
 
     expect((await request(app).get(`/orders/${body.order.id}`).set(bayo)).status).toBe(404)
@@ -173,7 +173,7 @@ describe("support and admin", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "INSTANT_PICKUP", address: "Ikeja", wasteType: "Paper", pickupDate: tomorrow })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Ikeja", wasteType: "Paper", pickupDate: tomorrow })
     await prisma.order.update({ where: { id: body.order.id }, data: { status: "PENDING" } })
     const assigned = await request(app)
       .patch(`/admin/orders/${body.order.id}`)
@@ -197,7 +197,7 @@ describe("admin order workflow", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(customer)
-      .send({ type: "INSTANT_PICKUP", address: "Ikeja", wasteType: "Paper", pickupDate: tomorrow })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Ikeja", wasteType: "Paper", pickupDate: tomorrow })
     const collector = await request(app)
       .post("/admin/collectors")
       .set(admin)
@@ -273,7 +273,7 @@ describe("instant pickup", () => {
       request(app)
         .post("/orders")
         .set(auth)
-        .send({ type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Plastic", ...body })
+        .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Yaba", wasteType: "Plastic", ...body })
 
     const three = await book({ bags: 3, pickupDate: tomorrow })
     expect(three.body.order).toMatchObject({ amount: 2100, quantity: 3, asap: false, scheduledDate: tomorrow })

@@ -10,14 +10,13 @@ import { font } from "../../theme"
 export default function Account() {
   const { user, setUser, signOut } = useAuth()
   const [name, setName] = useState(user?.name ?? "")
-  const [address, setAddress] = useState(user?.address ?? "")
   const [email, setEmail] = useState(user?.email ?? "")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
   const changed =
-    name.trim() !== user?.name || address.trim() !== (user?.address ?? "") || email.trim() !== (user?.email ?? "")
+    name.trim() !== user?.name || email.trim() !== (user?.email ?? "")
 
   async function save() {
     setBusy(true)
@@ -26,7 +25,6 @@ export default function Account() {
     try {
       const res = await api.updateProfile({
         name: name.trim(),
-        ...(address.trim() ? { address: address.trim() } : {}),
         ...(email.trim() ? { email: email.trim() } : {}),
       })
       setUser(res.user)
@@ -58,15 +56,9 @@ export default function Account() {
         autoComplete="email"
         hint="Payment receipts from Paystack are sent here."
       />
-      <TextField
-        label="Default pickup address"
-        value={address}
-        onChangeText={setAddress}
-        multiline
-        hint="Pre-filled when you book a pickup or order bags."
-      />
       {saved && !changed ? <Text style={font.muted}>Saved.</Text> : null}
       <Button title="Save changes" onPress={save} loading={busy} disabled={!changed || !name.trim()} />
+      <Button title="My addresses" variant="secondary" onPress={() => router.push("/addresses")} />
       <Button title="Change password" variant="secondary" onPress={() => router.push("/change-password")} />
       <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
     </Screen>

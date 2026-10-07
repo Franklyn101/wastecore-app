@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs"
 import { Router } from "express"
 import { z } from "zod"
+import { publicArea } from "../areas.ts"
 import { requireAdmin, requireUser } from "../auth.ts"
 import { prisma } from "../db.ts"
 import type { Order, Prisma } from "../generated/prisma/client.ts"
@@ -30,6 +31,7 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 const listOrdersQuery = z.object({
   status: z.enum(OrderStatus).optional(),
   type: z.enum(OrderType).optional(),
+  areaId: z.string().optional(),
   q: z.string().trim().max(100).optional(),
 })
 
@@ -48,8 +50,18 @@ const collectorSchema = z.object({
   name: trimmed(100, "Name"),
   phone: phoneSchema,
   area: trimmed(100, "Area"),
+  serviceAreaId: z.string().nullable().optional(),
   active: z.boolean().optional(),
 })
+
+const updateAreaSchema = z
+  .object({
+    active: z.boolean().optional(),
+    radiusKm: z.number().min(1, "Radius must be at least 1 km.").max(100, "Radius can be at most 100 km.").optional(),
+    centerLat: z.number().min(-90).max(90).optional(),
+    centerLng: z.number().min(-180).max(180).optional(),
+  })
+  .refine((b) => Object.values(b).some((v) => v !== undefined), "Nothing to update.")
 
 /** Only active collectors that staff have approved can be given jobs. */
 const canTakeJobs = (c: { active: boolean; approvedAt: Date | null } | null) => Boolean(c?.active && c.approvedAt)
@@ -74,8 +86,8 @@ adminRouter.get("/admin/summary", async (_req, res) => {
 })
 
 adminRouter.get("/admin/orders", async (req, res) => {
-  const { status, type, q } = listOrdersQuery.parse(req.query)
-  const where: Prisma.OrderWhereInput = { status, type }
+  const { status, type, areaId, q } = listOrdersQuery.parse(req.query)
+  const where: Prisma.OrderWhereInput = { status, type, areaId }
   if (q) {
     const digits = q.replace(/\D/g, "").replace(/^0/, "")
     where.OR = [
@@ -302,6 +314,37 @@ adminRouter.delete("/admin/collectors/:id/login", async (req, res) => {
   const collector = await findCollector(req.params.id)
   if (collector.userId) await prisma.user.delete({ where: { id: collector.userId } })
   res.json({ collector: adminCollector(await findCollector(collector.id)) })
+})
+
+// Service areas, with how many customers live there and how many asked us to come.
+adminRouter.get("/admin/areas", async (_req, res) => {
+  const [areas, addresses, interests, open] = await Promise.all([
+    prisma.serviceArea.findMany({ orderBy: { launchOrder: "asc" } }),
+    prisma.address.groupBy({ by: ["areaId"], where: { deletedAt: null }, _count: { _all: true } }),
+    prisma.areaInterest.groupBy({ by: ["areaId"], _count: { _all: true } }),
+    prisma.order.groupBy({ by: ["areaId"], where: { status: { in: ["PENDING", "ASSIGNED"] } }, _count: { _all: true } }),
+  ])
+  const count = (rows: { areaId: string | null; _count: { _all: number } }[], id: string) =>
+    rows.find((r) => r.areaId === id)?._count._all ?? 0
+  res.json({
+    areas: areas.map((a) => ({
+      ...publicArea(a),
+      savedAddresses: count(addresses, a.id),
+      waitingCustomers: count(interests, a.id),
+      openOrders: count(open, a.id),
+    })),
+  })
+})
+
+// Launch or pause an area, or change how far it reaches.
+adminRouter.patch("/admin/areas/:id", async (req, res) => {
+  const body = updateAreaSchema.parse(req.body)
+  const area = await prisma.serviceArea.findUnique({ where: { id: String(req.params.id) } })
+  if (!area) throw new HttpError(404, "Area not found.")
+  const updated = await prisma.serviceArea.update({ where: { id: area.id }, data: body })
+  // Tell everyone who asked to be notified, the first time an area opens.
+  if (body.active && !area.active) await events.areaLaunched(updated)
+  res.json({ area: publicArea(updated) })
 })
 
 adminRouter.get("/admin/support-tickets", async (req, res) => {

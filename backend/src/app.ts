@@ -3,6 +3,7 @@ import express from "express"
 import helmet from "helmet"
 import { errorHandler, HttpError } from "./http.ts"
 import { adminRouter } from "./routes/admin.ts"
+import { areasRouter } from "./routes/areas.ts"
 import { authRouter } from "./routes/auth.ts"
 import { catalogRouter } from "./routes/catalog.ts"
 import { collectorRouter } from "./routes/collector.ts"
@@ -29,7 +30,7 @@ export function createApp() {
   })
   app.use("/uploads", express.static(UPLOAD_DIR, { fallthrough: false, index: false }))
 
-  app.use(authRouter, passwordRouter, verifyRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, collectorRouter, notificationsRouter)
+  app.use(authRouter, passwordRouter, verifyRouter, areasRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, collectorRouter, notificationsRouter)
 
   app.use((_req, _res, next) => next(new HttpError(404, "Not found.")))
   app.use(errorHandler)

@@ -90,6 +90,64 @@ model User {
   pushTokens    PushToken[]
   notifications Notification[]
   oneTimeCodes  OneTimeCode[]
+  addresses     Address[]
+  areaInterests AreaInterest[]
+}
+
+// A city WasteCore serves (or will). Bookings must fall inside an active area.
+model ServiceArea {
+  id          String   @id @default(cuid())
+  slug        String   @unique // e.g. yenagoa
+  name        String // e.g. Yenagoa
+  state       String // e.g. Bayelsa
+  centerLat   Float
+  centerLng   Float
+  radiusKm    Float // bookings within this distance of the centre are in the area
+  active      Boolean  @default(false) // taking bookings
+  launchOrder Int // order the areas open in (and are listed in)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  addresses     Address[]
+  orders        Order[]
+  subscriptions Subscription[]
+  collectors    Collector[]
+  interests     AreaInterest[]
+}
+
+// A customer's saved place, with the exact spot pinned on a map.
+model Address {
+  id        String    @id @default(cuid())
+  userId    String
+  label     String // e.g. Home, Office
+  address   String // street address as the customer writes it
+  landmark  String? // e.g. "Opposite Ecobank, blue gate"
+  lat       Float
+  lng       Float
+  areaId    String
+  deletedAt DateTime? // removed by the customer; kept so past orders still make sense
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area ServiceArea @relation(fields: [areaId], references: [id])
+
+  @@index([userId])
+}
+
+// Someone outside our service areas asked to be told when we arrive.
+model AreaInterest {
+  id        String   @id @default(cuid())
+  userId    String
+  lat       Float
+  lng       Float
+  areaId    String? // the nearest area, if any
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area ServiceArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
+  @@index([areaId])
 }
 
 enum CodePurpose {
@@ -152,10 +210,12 @@ model Collector {
   // Staff-added collectors are approved at once; self sign-ups wait for staff to approve them.
   approvedAt     DateTime?
   selfRegistered Boolean   @default(false) // created by the collector signing up in the app
+  serviceAreaId  String? // the city they work in
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  serviceArea   ServiceArea?   @relation(fields: [serviceAreaId], references: [id], onDelete: SetNull)
   orders        Order[]
   subscriptions Subscription[]
 }
@@ -168,6 +228,11 @@ model Order {
   // Catalog key of what was bought: instant, a plan id, or small/medium/large bags.
   plan           String
   address        String
+  // Where exactly, copied from the saved address when booked.
+  landmark       String?
+  lat            Float?
+  lng            Float?
+  areaId         String?
   wasteType      String?
   // Pickup date, or (for bags) the order date.
   scheduledDate  DateTime       @db.Date
@@ -193,10 +258,12 @@ model Order {
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   collector    Collector?    @relation(fields: [collectorId], references: [id], onDelete: SetNull)
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  area         ServiceArea?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
   payments     Payment[]
 
   @@index([userId, createdAt])
   @@index([status, scheduledDate])
+  @@index([areaId, scheduledDate])
   @@index([subscriptionId])
 }
 
@@ -206,6 +273,10 @@ model Subscription {
   plan               String // catalog plan id, e.g. weekly_2 or premium
   status             SubscriptionStatus @default(PENDING_PAYMENT)
   address            String
+  landmark           String?
+  lat                Float?
+  lng                Float?
+  areaId             String?
   wasteType          String
   // Billing period [currentPeriodStart, currentPeriodEnd); end is exclusive. Set when first paid.
   startDate          DateTime           @db.Date
@@ -231,6 +302,7 @@ model Subscription {
   collector  Collector?    @relation(fields: [collectorId], references: [id], onDelete: SetNull)
   replaces   Subscription? @relation("PlanChange", fields: [replacesId], references: [id], onDelete: SetNull)
   replacedBy Subscription? @relation("PlanChange")
+  area       ServiceArea?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
   orders     Order[]
   payments   Payment[]
 

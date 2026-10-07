@@ -39,6 +39,12 @@
         {
           "color": "#167A3E"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "WasteCore uses your location to pin your pickup address on the map and check that we serve your area."
+        }
       ]
     ],
     "scheme": "wastecore"

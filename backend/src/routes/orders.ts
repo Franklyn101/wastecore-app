@@ -3,6 +3,7 @@ import { z } from "zod"
 import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { BAG_SIZES, bagSizeIds, INSTANT_PICKUP, MAX_BAG_PACKS } from "../catalog.ts"
 import { prisma } from "../db.ts"
+import { locationFields, resolveLocation } from "./areas.ts"
 import type { OrderType } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
 import { withUniqueReference } from "../references.ts"
@@ -12,7 +13,6 @@ import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
 import { addDays, toDay, ymd } from "../dates.ts"
 import { futureDateSchema, hourInLagos, todayInLagos, trimmed } from "../validation.ts"
 
-const address = trimmed(300, "Address")
 const wasteType = trimmed(100, "Waste type")
 
 // One-off services. Weekly and premium plans are subscriptions (routes/subscriptions.ts).
@@ -20,7 +20,7 @@ const createOrderSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("INSTANT_PICKUP"),
-      address,
+      ...locationFields,
       wasteType,
       bags: z.coerce
         .number()
@@ -41,7 +41,7 @@ const createOrderSchema = z.discriminatedUnion("type", [
       .int("Quantity must be a whole number.")
       .min(1, "Order at least 1 pack.")
       .max(MAX_BAG_PACKS, `You can order at most ${MAX_BAG_PACKS} packs.`),
-    address,
+    ...locationFields,
   }),
 ])
 
@@ -59,7 +59,6 @@ function orderData(body: CreateOrder) {
     return {
       type: body.type as OrderType,
       plan: INSTANT_PICKUP.id,
-      address: body.address,
       wasteType: body.wasteType,
       scheduledDate: body.asap ? asapDate() : body.pickupDate!,
       asap: body.asap,
@@ -70,7 +69,6 @@ function orderData(body: CreateOrder) {
   return {
     type: body.type as OrderType,
     plan: body.bagSize,
-    address: body.address,
     wasteType: null,
     scheduledDate: todayInLagos(),
     quantity: body.quantity,
@@ -89,14 +87,16 @@ ordersRouter.use("/orders", requireUser, requireCustomer)
 
 ordersRouter.post("/orders", async (req, res) => {
   const user = currentUser(req)
-  const data = orderData(createOrderSchema.parse(req.body))
+  const body = createOrderSchema.parse(req.body)
+  const location = await resolveLocation(body, user.id)
+  const data = orderData(body)
   const order = await withUniqueReference("WC", (reference) =>
     prisma.order.create({
-      data: { ...data, scheduledDate: toDay(data.scheduledDate), reference, userId: user.id },
+      data: { ...data, ...location, scheduledDate: toDay(data.scheduledDate), reference, userId: user.id },
     }),
   )
   // Remember the address for next time, like the bot's returning-customer flow.
-  if (!user.address) await prisma.user.update({ where: { id: user.id }, data: { address: data.address } })
+  if (!user.address) await prisma.user.update({ where: { id: user.id }, data: { address: location.address } })
   res.status(201).json({ order: customerOrder(order) })
 })
 

@@ -39,6 +39,8 @@ export default function AdminAccount() {
         <Row label="Role" value="Admin" />
       </Card>
 
+      <Button title="Service areas" variant="secondary" onPress={() => router.push("/admin/areas")} />
+
       <Section title="Help someone who's locked out">
         <Text style={font.muted}>
           Customers and collectors can reset their own password with a code by SMS. If that doesn't reach them, check who

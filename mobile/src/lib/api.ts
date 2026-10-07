@@ -4,7 +4,9 @@ import type {
   AppNotification,
   AdminSubscription,
   AdminSummary,
+  AdminArea,
   AdminTicket,
+  AreaCheck,
   Catalog,
   Collector,
   CollectorJob,
@@ -13,6 +15,8 @@ import type {
   OrderStatus,
   Payment,
   PlanChangeQuote,
+  SavedAddress,
+  ServiceArea,
   Subscription,
   SupportTicket,
   TicketStatus,
@@ -91,12 +95,14 @@ async function appendImage(form: FormData, field: string, image: PickedImage) {
 export type AuthResponse = { token: string; user: User }
 
 export type NewOrder =
-  | { type: "INSTANT_PICKUP"; address: string; wasteType: string; bags: number; asap: boolean; pickupDate?: string }
-  | { type: "WASTE_BAGS"; bagSize: string; quantity: number; address: string }
+  | { type: "INSTANT_PICKUP"; addressId: string; wasteType: string; bags: number; asap: boolean; pickupDate?: string }
+  | { type: "WASTE_BAGS"; bagSize: string; quantity: number; addressId: string }
+
+export type AddressInput = { label: string; address: string; landmark?: string | null; lat: number; lng: number }
 
 export const api = {
   register: (body: { name: string; phone: string; password: string }) => post<AuthResponse>("/auth/register", body),
-  registerCollector: (body: { name: string; phone: string; password: string; area: string }) =>
+  registerCollector: (body: { name: string; phone: string; password: string; area: string; serviceAreaId?: string }) =>
     post<AuthResponse>("/auth/register-collector", body),
   login: (body: { phone: string; password: string }) => post<AuthResponse>("/auth/login", body),
   me: () => request<{ user: User }>("/me"),
@@ -110,6 +116,15 @@ export const api = {
   updateProfile: (body: { name?: string; address?: string; email?: string }) => patch<{ user: User }>("/me", body),
 
   catalog: () => request<Catalog>("/catalog"),
+
+  areas: () => request<{ areas: ServiceArea[] }>("/areas"),
+  locate: (point: { lat: number; lng: number }) =>
+    request<AreaCheck>(`/areas/locate${query({ lat: String(point.lat), lng: String(point.lng) })}`),
+  notifyMe: (point: { lat: number; lng: number }) => post<{ ok: true }>("/areas/interest", point),
+  addresses: () => request<{ addresses: SavedAddress[] }>("/addresses"),
+  createAddress: (body: AddressInput) => post<{ address: SavedAddress }>("/addresses", body),
+  updateAddress: (id: string, body: Partial<AddressInput>) => patch<{ address: SavedAddress }>(`/addresses/${id}`, body),
+  deleteAddress: (id: string) => request<void>(`/addresses/${id}`, { method: "DELETE" }),
 
   registerPushToken: (token: string, platform: "ios" | "android") =>
     post<void>("/me/push-tokens", { token, platform }),
@@ -132,7 +147,7 @@ export const api = {
   subscriptions: () => request<{ subscriptions: Subscription[]; renewWindowDays: number }>("/subscriptions"),
   subscription: (id: string) =>
     request<{ subscription: Subscription; upcomingPickups: Order[] }>(`/subscriptions/${id}`),
-  subscribe: (body: { plan: string; address: string; wasteType: string; startDate: string }) =>
+  subscribe: (body: { plan: string; addressId: string; wasteType: string; startDate: string }) =>
     post<{ subscription: Subscription }>("/subscriptions", body),
   changeQuote: (id: string, plan: string) =>
     request<{ quote: PlanChangeQuote }>(`/subscriptions/${id}/change-quote${query({ plan })}`),
@@ -152,7 +167,7 @@ export const api = {
 
   admin: {
     summary: () => request<AdminSummary>("/admin/summary"),
-    orders: (params: { status?: OrderStatus; q?: string } = {}) =>
+    orders: (params: { status?: OrderStatus; q?: string; areaId?: string } = {}) =>
       request<{ orders: AdminOrder[] }>(`/admin/orders${query(params)}`),
     order: (id: string) => request<{ order: AdminOrder }>(`/admin/orders/${id}`),
     updateOrder: (
@@ -171,10 +186,13 @@ export const api = {
     rejectCollector: (id: string) => post<{ ok: true }>(`/admin/collectors/${id}/reject`),
     removeCollectorLogin: (id: string) =>
       request<{ collector: Collector }>(`/admin/collectors/${id}/login`, { method: "DELETE" }),
-    createCollector: (body: { name: string; phone: string; area: string }) =>
+    createCollector: (body: { name: string; phone: string; area: string; serviceAreaId?: string | null }) =>
       post<{ collector: Collector }>("/admin/collectors", body),
     updateCollector: (id: string, body: Partial<Omit<Collector, "id">>) =>
       patch<{ collector: Collector }>(`/admin/collectors/${id}`, body),
+    areas: () => request<{ areas: AdminArea[] }>("/admin/areas"),
+    updateArea: (id: string, body: { active?: boolean; radiusKm?: number }) =>
+      patch<{ area: ServiceArea }>(`/admin/areas/${id}`, body),
     tickets: (status?: TicketStatus) => request<{ tickets: AdminTicket[] }>(`/admin/support-tickets${query({ status })}`),
     updateTicket: (id: string, status: TicketStatus) =>
       patch<{ ticket: SupportTicket }>(`/admin/support-tickets/${id}`, { status }),

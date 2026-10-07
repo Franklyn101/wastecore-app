@@ -1,7 +1,8 @@
 // What each event tells whom. All notification wording lives here.
 import { planLabel } from "./catalog.ts"
-import type { Order, Subscription } from "./generated/prisma/client.ts"
+import type { Order, ServiceArea, Subscription } from "./generated/prisma/client.ts"
 import { findPlan } from "./catalog.ts"
+import { prisma } from "./db.ts"
 import { notify, notifyCollector, notifyStaff } from "./notify.ts"
 
 const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`
@@ -172,6 +173,19 @@ export const events = {
 
   async collectorApplied(name: string, area: string) {
     await notifyStaff({ title: "New collector application", body: `${name} (${area}) applied in the app.`, url: "/admin/collectors" })
+  },
+
+  // ── Areas ────────────────────────────────────────────────
+  /** Everyone who tapped "Notify me" for this area hears that it's open. */
+  async areaLaunched(area: ServiceArea) {
+    const waiting = await prisma.areaInterest.findMany({ where: { areaId: area.id }, select: { userId: true }, distinct: ["userId"] })
+    for (const { userId } of waiting) {
+      await notify(userId, {
+        title: `WasteCore is now in ${area.name}`,
+        body: "You can book pickups and plans at your address now.",
+        url: "/",
+      })
+    }
   },
 
   async collectorApproved(userId: string) {

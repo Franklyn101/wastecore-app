@@ -1,6 +1,7 @@
 import { router, Stack, useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import { Switch, Text, View } from "react-native"
+import { AreaChips } from "../../components/AreaChips"
 import { Badge, Button, Card, ErrorBanner, Loading, Screen, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { confirmAction } from "../../lib/dialogs"
@@ -15,6 +16,7 @@ export default function CollectorEditor() {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [area, setArea] = useState("")
+  const [city, setCity] = useState<string | null>(null)
   const [active, setActive] = useState(true)
   const [hasLogin, setHasLogin] = useState(false)
   const [password, setPassword] = useState("")
@@ -32,6 +34,7 @@ export default function CollectorEditor() {
         setName(c.name)
         setPhone(c.phone)
         setArea(c.area)
+        setCity(c.serviceAreaId)
         setActive(c.active)
         setHasLogin(c.hasLogin)
         setLoaded(true)
@@ -46,7 +49,7 @@ export default function CollectorEditor() {
 
   function save() {
     void submit(async () => {
-      const body = { name: name.trim(), phone: phone.trim(), area: area.trim() }
+      const body = { name: name.trim(), phone: phone.trim(), area: area.trim(), serviceAreaId: city }
       if (id) await api.admin.updateCollector(id, { ...body, active })
       else await api.admin.createCollector(body)
       router.back()
@@ -59,7 +62,8 @@ export default function CollectorEditor() {
       {error ? <ErrorBanner message={error} /> : null}
       <TextField label="Full name" value={name} onChangeText={setName} />
       <TextField label="Phone number" placeholder="08012345678" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-      <TextField label="Area covered" placeholder="e.g. Ikeja, Lekki Phase 1" value={area} onChangeText={setArea} />
+      <AreaChips label="City" value={city} onChange={setCity} />
+      <TextField label="Neighbourhoods covered" placeholder="e.g. Ekeki, Kpansia" value={area} onChangeText={setArea} />
       {id ? (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           <View style={{ flex: 1 }}>

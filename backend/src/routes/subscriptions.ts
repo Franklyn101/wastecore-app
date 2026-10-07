@@ -6,12 +6,13 @@ import { planIds } from "../catalog.ts"
 import { daysBetween, toDay, today } from "../dates.ts"
 import { prisma } from "../db.ts"
 import { HttpError } from "../http.ts"
+import { locationFields, resolveLocation } from "./areas.ts"
 import { customerOrder, subscription } from "../serializers.ts"
 import { futureDateSchema, trimmed } from "../validation.ts"
 
 const createSchema = z.object({
   plan: z.enum(planIds, "Choose a plan."),
-  address: trimmed(300, "Address"),
+  ...locationFields,
   wasteType: trimmed(100, "Waste type"),
   startDate: futureDateSchema,
 })
@@ -59,11 +60,18 @@ subscriptionsRouter.post("/subscriptions", async (req, res) => {
   const active = await prisma.subscription.findFirst({ where: { userId: user.id, status: "ACTIVE" } })
   if (active) throw new HttpError(409, "You already have an active plan. Use Change plan to switch.")
 
+  const location = await resolveLocation(body, user.id)
   await cancelUnpaid(user.id)
   const sub = await prisma.subscription.create({
-    data: { ...body, startDate: toDay(body.startDate), userId: user.id },
+    data: {
+      plan: body.plan,
+      wasteType: body.wasteType,
+      ...location,
+      startDate: toDay(body.startDate),
+      userId: user.id,
+    },
   })
-  if (!user.address) await prisma.user.update({ where: { id: user.id }, data: { address: body.address } })
+  if (!user.address) await prisma.user.update({ where: { id: user.id }, data: { address: location.address } })
   res.status(201).json({ subscription: subscription(sub) })
 })
 
@@ -88,6 +96,10 @@ subscriptionsRouter.post("/subscriptions/:id/change", async (req, res) => {
       userId: user.id,
       plan,
       address: current.address,
+      landmark: current.landmark,
+      lat: current.lat,
+      lng: current.lng,
+      areaId: current.areaId,
       wasteType: current.wasteType,
       startDate: today(),
       credit: quote.credit,

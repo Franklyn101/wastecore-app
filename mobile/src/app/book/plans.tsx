@@ -1,10 +1,10 @@
 import { router, Stack, useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import { Text, View } from "react-native"
+import { AddressPicker } from "../../components/AddressPicker"
 import { DatePicker } from "../../components/DatePicker"
-import { Button, Card, Chip, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
+import { Button, Card, Chip, ErrorBanner, Loading, OptionCard, Screen, Section } from "../../components/ui"
 import { api } from "../../lib/api"
-import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
 import { naira } from "../../lib/format"
 import type { Plan, PlanChangeQuote } from "../../lib/types"
@@ -15,10 +15,9 @@ import { font, spacing } from "../../theme"
 // or switch an active plan when opened with ?change=<subscription id>.
 export default function ChoosePlan() {
   const { change, current } = useLocalSearchParams<{ change?: string; current?: string }>()
-  const { user } = useAuth()
   const { catalog, error: catalogError, reload } = useCatalog()
   const [plan, setPlan] = useState<string | null>(null)
-  const [address, setAddress] = useState(user?.address ?? "")
+  const [addressId, setAddressId] = useState<string | null>(null)
   const [wasteType, setWasteType] = useState<string | null>(null)
   const [date, setDate] = useState<string | null>(null)
   const [quote, setQuote] = useState<PlanChangeQuote | null>(null)
@@ -37,13 +36,13 @@ export default function ChoosePlan() {
 
   if (!catalog) return catalogError ? <ErrorBanner message={catalogError} onRetry={reload} /> : <Loading />
 
-  const ready = change ? quote?.allowed : plan && address.trim() && wasteType && date
+  const ready = change ? quote?.allowed : plan && addressId && wasteType && date
 
   function next() {
     void submit(async () => {
       const { subscription } = change
         ? await api.changePlan(change, plan!)
-        : await api.subscribe({ plan: plan!, address: address.trim(), wasteType: wasteType!, startDate: date! })
+        : await api.subscribe({ plan: plan!, addressId: addressId!, wasteType: wasteType!, startDate: date! })
       router.replace({ pathname: "/plan/checkout", params: { id: subscription.id } })
     })
   }
@@ -110,7 +109,7 @@ export default function ChoosePlan() {
         ) : null
       ) : (
         <>
-          <TextField label="Pickup address" value={address} onChangeText={setAddress} multiline autoComplete="street-address" />
+          <AddressPicker label="Pickup address" value={addressId} onChange={setAddressId} />
           <View style={{ gap: spacing.sm }}>
             <Text style={font.label}>Main waste type</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>

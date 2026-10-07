@@ -29,6 +29,8 @@ const registerSchema = z.object({
 
 const registerCollectorSchema = registerSchema.omit({ address: true }).extend({
   area: trimmed(100, "Area"),
+  // The city they'll work in (GET /areas). Optional for older app versions.
+  serviceAreaId: z.string().optional(),
 })
 
 const loginSchema = z.object({
@@ -86,6 +88,9 @@ authRouter.post("/auth/register", authLimiter, async (req, res) => {
 // Collectors can sign themselves up; they see no jobs until staff approve them.
 authRouter.post("/auth/register-collector", authLimiter, async (req, res) => {
   const body = registerCollectorSchema.parse(req.body)
+  const serviceAreaId = body.serviceAreaId
+    ? (await prisma.serviceArea.findUnique({ where: { id: body.serviceAreaId } }))?.id
+    : undefined
   await freeUnverifiedNumber(body.phone)
   const passwordHash = await bcrypt.hash(body.password, BCRYPT_ROUNDS)
 
@@ -100,7 +105,14 @@ authRouter.post("/auth/register-collector", authLimiter, async (req, res) => {
       await tx.collector.update({ where: { id: existing.id }, data: { userId: user.id, approvedAt: null } })
     } else {
       await tx.collector.create({
-        data: { name: body.name, phone: body.phone, area: body.area, userId: user.id, selfRegistered: true },
+        data: {
+          name: body.name,
+          phone: body.phone,
+          area: body.area,
+          serviceAreaId: serviceAreaId ?? null,
+          userId: user.id,
+          selfRegistered: true,
+        },
       })
     }
     return user

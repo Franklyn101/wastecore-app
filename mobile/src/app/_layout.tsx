@@ -44,12 +44,15 @@ function RootNavigator() {
         <Stack.Screen name="payment-return" options={{ title: "Payment" }} />
         <Stack.Screen name="orders/[id]" options={{ title: "Order details" }} />
         <Stack.Screen name="support/new" options={{ title: "Contact support" }} />
+        <Stack.Screen name="addresses/index" options={{ title: "My addresses" }} />
+        <Stack.Screen name="addresses/edit" options={{ title: "Address" }} />
       </Stack.Protected>
       <Stack.Protected guard={isAdmin}>
         <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="admin/orders/[id]" options={{ title: "Manage order" }} />
         <Stack.Screen name="admin/collector" options={{ title: "Collector" }} />
         <Stack.Screen name="admin/plans/[id]" options={{ title: "Customer plan" }} />
+        <Stack.Screen name="admin/areas" options={{ title: "Service areas" }} />
       </Stack.Protected>
       <Stack.Protected guard={isCollector}>
         <Stack.Screen name="collector/(tabs)" options={{ headerShown: false }} />

@@ -6,7 +6,7 @@ import { createApp } from "../src/app.ts"
 import { runBillingJobs } from "../src/billing.ts"
 import { addDays, addPeriod, pickupDates, toDay, today, ymd } from "../src/dates.ts"
 import { prisma } from "../src/db.ts"
-import { resetDatabase, verifyPhone } from "./helpers.ts"
+import { resetDatabase, verifyPhone, YENAGOA } from "./helpers.ts"
 
 const app = createApp()
 let paystack: MockPaystack
@@ -56,7 +56,7 @@ async function subscribe(auth: Auth, plan = "weekly_2") {
   const res = await request(app)
     .post("/subscriptions")
     .set(auth)
-    .send({ plan, address: "12 Allen Avenue, Ikeja", wasteType: "Mixed", startDate })
+    .send({ plan, ...YENAGOA, address: "12 Allen Avenue, Ikeja", wasteType: "Mixed", startDate })
   expect(res.status).toBe(201)
   return res.body.subscription.id as string
 }
@@ -105,7 +105,7 @@ describe("subscriptions", () => {
     const second = await request(app)
       .post("/subscriptions")
       .set(auth)
-      .send({ plan: "premium", address: "x", wasteType: "Mixed", startDate })
+      .send({ plan: "premium", ...YENAGOA, address: "x", wasteType: "Mixed", startDate })
     expect(second.status).toBe(409)
   })
 
@@ -238,7 +238,7 @@ describe("one-off orders paid online", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "INSTANT_PICKUP", address: "Ikeja", wasteType: "Paper", pickupDate: startDate })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Ikeja", wasteType: "Paper", pickupDate: startDate })
     await payFor(auth, { orderId: body.order.id })
 
     const order = await request(app).get(`/orders/${body.order.id}`).set(auth)
@@ -256,7 +256,7 @@ describe("one-off orders paid online", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "INSTANT_PICKUP", address: "Ikeja", wasteType: "Paper", pickupDate: startDate })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Ikeja", wasteType: "Paper", pickupDate: startDate })
 
     const good = await request(app)
       .post("/payments")
@@ -270,7 +270,7 @@ describe("one-off orders paid online", () => {
     const { body: o2 } = await request(app)
       .post("/orders")
       .set(auth)
-      .send({ type: "WASTE_BAGS", bagSize: "small", quantity: 1, address: "Ikeja" })
+      .send({ type: "WASTE_BAGS", bagSize: "small", quantity: 1, ...YENAGOA, address: "Ikeja" })
     const evil = await request(app)
       .post("/payments")
       .set(auth)

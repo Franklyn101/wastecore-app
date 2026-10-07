@@ -2,7 +2,7 @@ import request from "supertest"
 import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { createApp } from "../src/app.ts"
 import { prisma } from "../src/db.ts"
-import { resetDatabase, verifyPhone } from "./helpers.ts"
+import { resetDatabase, verifyPhone, YENAGOA } from "./helpers.ts"
 
 const app = createApp()
 const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
@@ -29,7 +29,7 @@ async function setup() {
   const created = await request(app)
     .post("/orders")
     .set(customer)
-    .send({ type: "INSTANT_PICKUP", address: "12 Allen Avenue", wasteType: "Plastic", bags: 3, pickupDate: tomorrow })
+    .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "12 Allen Avenue", wasteType: "Plastic", bags: 3, pickupDate: tomorrow })
   const orderId = created.body.order.id as string
   await request(app)
     .post(`/orders/${orderId}/receipt`)
@@ -179,7 +179,7 @@ describe("collector self sign-up", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(customer)
-      .send({ type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Paper", asap: true })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Yaba", wasteType: "Paper", asap: true })
     await prisma.order.update({ where: { id: body.order.id }, data: { status: "PENDING" } })
     expect((await request(app).patch(`/admin/orders/${body.order.id}`).set(admin).send({ collectorId: id })).status).toBe(400)
 

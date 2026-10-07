@@ -1,33 +1,32 @@
 import { router } from "expo-router"
 import { useState } from "react"
 import { Text } from "react-native"
+import { AddressPicker } from "../../components/AddressPicker"
 import { Stepper } from "../../components/Stepper"
-import { Button, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
+import { Button, ErrorBanner, Loading, OptionCard, Screen, Section } from "../../components/ui"
 import { api } from "../../lib/api"
-import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
 import { naira } from "../../lib/format"
 import { useSubmit } from "../../lib/useSubmit"
 import { font } from "../../theme"
 
 export default function OrderBags() {
-  const { user } = useAuth()
   const { catalog, error: catalogError, reload } = useCatalog()
   const [size, setSize] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
-  const [address, setAddress] = useState(user?.address ?? "")
+  const [addressId, setAddressId] = useState<string | null>(null)
   const { busy, error, submit } = useSubmit()
 
   if (!catalog) return catalogError ? <ErrorBanner message={catalogError} onRetry={reload} /> : <Loading />
 
   const bag = catalog.bagSizes.find((b) => b.id === size)
   const total = bag ? bag.price * quantity : null
-  const ready = bag && address.trim()
+  const ready = bag && addressId
 
   function order() {
     if (!ready) return
     void submit(async () => {
-      const res = await api.createOrder({ type: "WASTE_BAGS", bagSize: bag!.id, quantity, address: address.trim() })
+      const res = await api.createOrder({ type: "WASTE_BAGS", bagSize: bag!.id, quantity, addressId: addressId! })
       router.replace(`/orders/${res.order.id}`)
     })
   }
@@ -49,7 +48,7 @@ export default function OrderBags() {
 
       <Stepper label="Packs" value={quantity} onChange={setQuantity} max={catalog.maxBagPacks} unit="packs" />
 
-      <TextField label="Delivery address" value={address} onChangeText={setAddress} multiline />
+      <AddressPicker label="Delivery address" value={addressId} onChange={setAddressId} />
 
       {error ? <ErrorBanner message={error} /> : null}
       <Button

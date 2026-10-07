@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from "expo-router"
 import { useState } from "react"
 import { KeyboardAvoidingView, Platform, Text } from "react-native"
+import { AreaChips } from "../components/AreaChips"
 import { Button, ErrorBanner, OptionCard, Screen, Section, TextField } from "../components/ui"
 import { useAuth } from "../lib/auth"
 import { font } from "../theme"
@@ -15,18 +16,19 @@ export default function SignUp() {
   const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
   const [area, setArea] = useState("")
+  const [city, setCity] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const collector = kind === "collector"
   const passwordTooShort = password.length > 0 && password.length < 8
-  const ready = name.trim() && phone && password.length >= 8 && (!collector || area.trim())
+  const ready = name.trim() && phone && password.length >= 8 && (!collector || (area.trim() && city))
 
   async function submit() {
     setError(null)
     setBusy(true)
     try {
-      if (collector) await signUpCollector(name, phone, password, area)
+      if (collector) await signUpCollector(name, phone, password, area, city!)
       else await signUp(name, phone, password)
     } catch (e) {
       setError((e as Error).message)
@@ -70,13 +72,16 @@ export default function SignUp() {
           onChangeText={setPhone}
         />
         {collector ? (
-          <TextField
-            label="Area you can cover"
-            placeholder="e.g. Ikeja, Yaba, Surulere"
-            value={area}
-            onChangeText={setArea}
-            maxLength={100}
-          />
+          <>
+            <AreaChips label="City you'll work in" value={city} onChange={setCity} />
+            <TextField
+              label="Neighbourhoods you can cover"
+              placeholder="e.g. Ekeki, Kpansia, Amarata"
+              value={area}
+              onChangeText={setArea}
+              maxLength={100}
+            />
+          </>
         ) : null}
         <TextField
           label="Password"

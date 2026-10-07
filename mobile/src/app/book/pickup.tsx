@@ -1,11 +1,11 @@
 import { router } from "expo-router"
 import { useState } from "react"
 import { Text, View } from "react-native"
+import { AddressPicker } from "../../components/AddressPicker"
 import { DatePicker } from "../../components/DatePicker"
 import { Stepper } from "../../components/Stepper"
 import { Button, Chip, ErrorBanner, Loading, OptionCard, Screen, Section, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
-import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
 import { hourInLagos, hourLabel, naira } from "../../lib/format"
 import { useSubmit } from "../../lib/useSubmit"
@@ -13,9 +13,8 @@ import { font, spacing } from "../../theme"
 
 // One-time pickup, no subscription: address -> waste -> bags -> when -> pay.
 export default function BookPickup() {
-  const { user } = useAuth()
   const { catalog, error: catalogError, reload } = useCatalog()
-  const [address, setAddress] = useState(user?.address ?? "")
+  const [addressId, setAddressId] = useState<string | null>(null)
   const [wasteType, setWasteType] = useState<string | null>(null)
   const [otherWaste, setOtherWaste] = useState("")
   const [bags, setBags] = useState(1)
@@ -30,14 +29,14 @@ export default function BookPickup() {
   const sameDay = hourInLagos() < instant.asapCutoffHour
   const waste = wasteType === "Other" ? otherWaste.trim() : wasteType
   const total = instant.pricePerBag * bags
-  const ready = address.trim() && waste && (when === "asap" || date)
+  const ready = addressId && waste && (when === "asap" || date)
 
   function book() {
     if (!ready) return
     void submit(async () => {
       const { order } = await api.createOrder({
         type: "INSTANT_PICKUP",
-        address: address.trim(),
+        addressId: addressId!,
         wasteType: waste!,
         bags,
         asap: when === "asap",
@@ -51,14 +50,7 @@ export default function BookPickup() {
     <Screen>
       <Text style={font.muted}>One-time pickup, no subscription needed. {naira(instant.pricePerBag)} per bag.</Text>
 
-      <TextField
-        label="Pickup address"
-        placeholder="House number, street, area"
-        value={address}
-        onChangeText={setAddress}
-        multiline
-        autoComplete="street-address"
-      />
+      <AddressPicker label="Pickup address" value={addressId} onChange={setAddressId} />
 
       <View style={{ gap: spacing.sm }}>
         <Text style={font.label}>Waste type</Text>

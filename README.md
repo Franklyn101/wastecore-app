@@ -23,7 +23,20 @@ wastecore-app/
 | "Active Request Found" | Home screen lists active requests. The **My orders** tab shows all orders with live status. |
 | Typing `cancel` | Unpaid orders can be cancelled in the app. Paid ones go through support. |
 
-The app has a few things the bot doesn't: accounts with a phone number and password, a saved default address, an order history, a payment progress tracker, and order references (`WC-XXXXXX`) for the transfer narration.
+The app has a few things the bot doesn't: accounts with a phone number and password, saved addresses pinned on a map, an order history, a payment progress tracker, and order references (`WC-XXXXXX`) for the transfer narration.
+
+## Service areas, addresses and maps
+
+WasteCore launches city by city: **Yenagoa (Bayelsa) first**, then **Port Harcourt**, then **Lagos**. Each city is a circle around its centre (Yenagoa 15 km, Port Harcourt 20 km, Lagos 35 km). Bookings are only accepted inside a **live** city. At launch only Yenagoa is live.
+
+- **Saved addresses.** Customers save addresses (Home, Office, Shop) with the street, a landmark ("opposite the church, blue gate") and the exact spot pinned on a map. Every pickup, plan and bag order is booked at a saved address.
+- **The map follows the customer.** It opens at the phone's location (if they allow it), otherwise at the first live city. They move the map until the pin sits on their gate. As they move it, the app shows "We pick up here: Yenagoa, Bayelsa" or "We're not in Port Harcourt yet", with a **Notify me** button.
+- **Collectors** see the pin on a map in each job, the landmark, and a **Directions** button that opens Google Maps with turn-by-turn directions to the exact spot.
+- **Staff** open **Account → Service areas** to see each city on a map, with its saved addresses, open orders and how many people asked to be notified. They can **launch or pause** a city and change how far it reaches. Launching a city sends a notification to everyone who tapped **Notify me** there. Collectors are linked to a city, and when staff assign an order, collectors from the order's city are listed first.
+
+Maps use OpenStreetMap through Leaflet, so no Google Maps key is needed. For heavy production use, switch the tile URL in `mobile/src/components/LeafletMap.tsx` to a hosted tile provider (for example MapTiler or Stadia), per the [OpenStreetMap tile policy](https://operations.osmfoundation.org/policies/tiles/).
+
+The cities are added by the `service_areas` database migration. To add another city later, insert a `ServiceArea` row (slug, name, state, centre, radius, `active = false`, next `launchOrder`), then launch it from the app.
 
 ## Staff (admin) screens
 
@@ -33,7 +46,7 @@ Staff use the **same app**. When someone with an admin account signs in, they ge
 | --- | --- |
 | **Orders** | A queue filtered by status (To do, Assigned, Unpaid, …) with counts, plus search by reference, customer name or phone. Open an order to view the receipt, then **confirm the payment and assign a collector** (or activate an upgrade plan), **reject the receipt** with a message the customer sees, mark the order completed or incomplete, change the collector, cancel it, or keep an internal note. One tap calls or WhatsApps the customer. |
 | **Plans** | Every customer plan with its period and renewal. Set a plan's regular collector, who is then assigned all its pickups. |
-| **Collectors** | Add drivers, edit their details, and deactivate them. |
+| **Collectors** | Add drivers, edit their details (including the city they work in), and deactivate them. |
 | **Tickets** | Support tickets by status: call the customer, start, resolve or reopen. |
 
 Admin accounts are created with `npm run db:create-admin` (see below). The server checks the role on every admin request; a customer who opens an admin link gets nothing.
@@ -43,7 +56,7 @@ Admin accounts are created with `npm run db:create-admin` (see below). The serve
 Collectors (drivers) use the same app. There are two ways to get them in:
 
 1. **Staff add them.** Staff set a password under **Collectors → (collector) → App login**. The collector signs in with their phone number and that password, and can start straight away.
-2. **They apply in the app.** On the sign-up screen they choose **Work as a collector** and enter their name, phone, password and the area they cover. They can sign in at once but see **Waiting for approval** until staff approve them. Staff see new applications at the top of the **Collectors** tab, with **Approve** and **Reject** buttons.
+2. **They apply in the app.** On the sign-up screen they choose **Work as a collector** and enter their name, phone, password, the city they'll work in and the neighbourhoods they cover. They can sign in at once but see **Waiting for approval** until staff approve them. Staff see new applications at the top of the **Collectors** tab, with **Approve** and **Reject** buttons.
 
 Applicants never see jobs (customer names, numbers and addresses) before approval. If someone applies with the number of a collector staff already added, the login is linked to that record but still needs approval. Rejecting removes the login.
 
@@ -52,7 +65,7 @@ Deactivating a collector, or removing their login, stops them signing in.
 | Screen | What the collector does |
 | --- | --- |
 | **My jobs** | Their open pickups and bag deliveries, grouped Overdue / Today / Tomorrow / by date, with ASAP jobs flagged. Shows jobs done today and this week. |
-| **Job** | Customer name with **Call** and **WhatsApp**, the address with **Open in Maps**, what to collect or deliver, and staff notes (e.g. gate code). Tap **I'm on my way** (the customer sees "On the way"), then **Mark completed** with an optional photo and note, or **Couldn't complete** with a reason. |
+| **Job** | Customer name with **Call** and **WhatsApp**, the address and landmark with the spot on a map and **Directions**, what to collect or deliver, and staff notes (e.g. gate code). Tap **I'm on my way** (the customer sees "On the way"), then **Mark completed** with an optional photo and note, or **Couldn't complete** with a reason. |
 | **History** | Jobs they closed in the last 30 days, with their notes and photos. |
 
 Collectors only see jobs assigned to them, and never see prices or payment details. The customer sees the collector's note, the photo, and the reason if a pickup couldn't be done. Staff see all of it on the order, with times.
@@ -221,7 +234,7 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | Method | Path | Who | Purpose |
 | --- | --- | --- | --- |
 | POST | `/auth/register` | public | `{ name, phone, password }` → `{ token, user }` |
-| POST | `/auth/register-collector` | public | `{ name, phone, password, area }`: applies as a collector (needs staff approval) |
+| POST | `/auth/register-collector` | public | `{ name, phone, password, area, serviceAreaId? }`: applies as a collector (needs staff approval) |
 | POST | `/auth/password-reset/request` | public | `{ phone }`: texts (and emails) a 6-digit code |
 | POST | `/auth/password-reset/confirm` | public | `{ phone, code, password }` → `{ token, user }` |
 | POST | `/me/phone/send-code` | any | Sends a new verification code (once a minute) |
@@ -231,7 +244,12 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | POST | `/auth/login` | public | `{ phone, password }` → `{ token, user }` (customers, staff and collectors) |
 | GET / PATCH | `/me` | customer | Read or update name and default address |
 | GET | `/catalog` | public | Plans, prices, waste types, support categories, bank details |
-| POST | `/orders` | customer | Create an order (body depends on `type`, see `src/routes/orders.ts`) |
+| GET | `/areas` | public | Cities in launch order, with centre, radius and whether they're live |
+| GET | `/areas/locate?lat=&lng=` | public | Whether a pinned spot is served, which city it's in, and the nearest city |
+| POST | `/areas/interest` | any | `{ lat, lng }`: "Notify me when you launch here" |
+| GET / POST | `/addresses` | customer | Saved addresses; create with `{ label, address, landmark?, lat, lng }` (must be in a live city) |
+| PATCH / DELETE | `/addresses/:id` | customer | Edit (moving the pin re-checks the city) or remove an address |
+| POST | `/orders` | customer | Create an order (body depends on `type`, see `src/routes/orders.ts`). Location is `{ addressId }`, or `{ address, landmark?, lat, lng }`; spots outside a live city get a 422. |
 | GET | `/orders`, `/orders/:id` | customer | The customer's own orders |
 | POST | `/orders/:id/receipt` | customer | Multipart `receipt` image (JPEG/PNG/WEBP/HEIC, ≤ 5 MB) |
 | POST | `/orders/:id/cancel` | customer | Cancel an unpaid order |
@@ -239,7 +257,7 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | POST / DELETE | `/me/push-tokens` | any | `{ token, platform }`: register or remove this phone for push |
 | GET | `/notifications` | any | The latest 50 notifications and the unread count |
 | POST | `/notifications/read` | any | `{ ids? }`: mark some, or all, as read |
-| GET / POST | `/subscriptions` | customer | List plans, or sign up `{ plan, address, wasteType, startDate }` (active once paid) |
+| GET / POST | `/subscriptions` | customer | List plans, or sign up `{ plan, addressId, wasteType, startDate }` (active once paid) |
 | GET | `/subscriptions/:id` | customer | A plan with its upcoming pickups |
 | GET | `/subscriptions/:id/change-quote?plan=` | customer | Credit and amount due to switch plan today |
 | POST | `/subscriptions/:id/change` | customer | Start a plan change (replaces the current plan once paid) |
@@ -250,7 +268,8 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | GET | `/payments/paystack/callback` | Paystack | Browser return after checkout; sends the customer back to the app |
 | POST | `/payments/paystack/webhook` | Paystack | Signed payment notifications |
 | GET | `/admin/summary` | admin | Order counts by status and number of open tickets |
-| GET | `/admin/orders?status=&type=&q=` | admin | Orders with customer and collector details; `q` searches reference, name and phone |
+| GET / PATCH | `/admin/areas`, `/admin/areas/:id` | admin | Cities with counts; `{ active?, radiusKm? }` launches, pauses or resizes one |
+| GET | `/admin/orders?status=&type=&areaId=&q=` | admin | Orders with customer and collector details; `q` searches reference, name and phone |
 | GET | `/admin/orders/:id` | admin | One order |
 | PATCH | `/admin/orders/:id` | admin | `{ status?, collectorId?, adminNote?, customerNote? }`. Only valid status moves are accepted (see the lifecycle above). |
 | GET / POST / PATCH | `/admin/collectors` | admin | Manage collectors |

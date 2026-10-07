@@ -219,6 +219,7 @@ export default function OrderDetails() {
           value={current.type === "WASTE_BAGS" ? formatDate(current.scheduledDate) : pickupWhen(current)}
         />
         <Row label={current.type === "WASTE_BAGS" ? "Delivery address" : "Address"} value={current.address} />
+        {current.landmark ? <Row label="Landmark" value={current.landmark} /> : null}
         <Row label="Amount" value={current.type === "PLAN_PICKUP" ? "Included in your plan" : naira(current.amount)} />
         {current.paymentMethod ? (
           <Row label="Paid by" value={current.paymentMethod === "PAYSTACK" ? "Paystack" : "Bank transfer"} />

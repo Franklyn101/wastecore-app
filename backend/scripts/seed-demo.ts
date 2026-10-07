@@ -18,18 +18,34 @@ async function user(phone: string, name: string, password: string, role: "ADMIN"
   })
 }
 
+// Yenagoa, Bayelsa is the launch area (seeded by the service_areas migration).
+const yenagoa = await prisma.serviceArea.findUniqueOrThrow({ where: { slug: "yenagoa" } })
+
 await user("+2348090000001", "Grace (Ops)", "staff-password-123", "ADMIN")
-await user("+2348035551234", "Ada Obi", "customer-pass-1", "CUSTOMER", "12 Allen Avenue, Ikeja, Lagos")
+const ada = await user("+2348035551234", "Ada Obi", "customer-pass-1", "CUSTOMER", "14 Azikoro Road, Ekeki, Yenagoa")
+if ((await prisma.address.count({ where: { userId: ada.id } })) === 0) {
+  await prisma.address.create({
+    data: {
+      userId: ada.id,
+      label: "Home",
+      address: "14 Azikoro Road, Ekeki, Yenagoa",
+      landmark: "Opposite the filling station, green gate",
+      lat: 4.9334,
+      lng: 6.2735,
+      areaId: yenagoa.id,
+    },
+  })
+}
 
 for (const c of [
-  { phone: "+2347011112222", name: "Musa Bello", area: "Ikeja, Ogba", login: true },
-  { phone: "+2347033334444", name: "Bola Ahmed", area: "Lekki, Ajah", login: false },
+  { phone: "+2347011112222", name: "Musa Bello", area: "Ekeki, Kpansia", login: true },
+  { phone: "+2347033334444", name: "Ebiere Tari", area: "Amarata, Opolo", login: false },
 ]) {
   const existing = await prisma.collector.findFirst({ where: { phone: c.phone } })
   const login = c.login ? await user(c.phone, c.name, "collector-pass-1", "COLLECTOR") : null
   if (!existing) {
     await prisma.collector.create({
-      data: { name: c.name, phone: c.phone, area: c.area, approvedAt: now, userId: login?.id },
+      data: { name: c.name, phone: c.phone, area: c.area, serviceAreaId: yenagoa.id, approvedAt: now, userId: login?.id },
     })
   }
 }

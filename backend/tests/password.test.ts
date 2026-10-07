@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { createApp } from "../src/app.ts"
 import { prisma } from "../src/db.ts"
 import { flushMessages } from "../src/messaging.ts"
-import { resetDatabase } from "./helpers.ts"
+import { resetDatabase, YENAGOA } from "./helpers.ts"
 
 const app = createApp()
 
@@ -171,7 +171,7 @@ describe("phone verification", () => {
     expect(verifyTexts()[0].to).toBe("2348012345678")
 
     // Signed in, but can't order until verified.
-    const order = { type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Paper", asap: true }
+    const order = { type: "INSTANT_PICKUP", ...YENAGOA, address: "Yaba", wasteType: "Paper", asap: true }
     const blocked = await request(app).post("/orders").set(auth).send(order)
     expect(blocked.status).toBe(403)
     expect(blocked.body.error).toMatch(/verify your phone/)

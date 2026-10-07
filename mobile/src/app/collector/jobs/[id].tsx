@@ -3,18 +3,19 @@ import { router, useLocalSearchParams } from "expo-router"
 import { useState } from "react"
 import { Alert, Image, Linking, Platform, StyleSheet, Text, View } from "react-native"
 import { jobLoad, JOB_KIND } from "../../../components/JobCard"
+import { MapView } from "../../../components/MapView"
 import { Badge, Button, Card, Chip, ErrorBanner, Loading, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api, type PickedImage } from "../../../lib/api"
 import { confirmAction } from "../../../lib/dialogs"
 import { formatDate } from "../../../lib/format"
 import type { CollectorJob } from "../../../lib/types"
+import { directionsUrl } from "../../../lib/location"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
 import { colors, font, radius, spacing } from "../../../theme"
 
 const REASONS = ["Customer not home", "Gate locked", "Wrong address", "Waste not ready", "Couldn't reach customer"]
 
-const mapsUrl = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
 const whatsappUrl = (phone: string) => `https://wa.me/${phone.replace(/^\+/, "")}`
 
 export default function Job() {
@@ -76,8 +77,12 @@ export default function Job() {
 
       <Section title="Where">
         <Card>
+          {job.lat != null && job.lng != null ? (
+            <MapView center={{ lat: job.lat, lng: job.lng }} pin={{ lat: job.lat, lng: job.lng }} height={200} zoom={17} />
+          ) : null}
           <Text style={font.body}>{job.address}</Text>
-          <Button title="Open in Maps" variant="secondary" onPress={() => void Linking.openURL(mapsUrl(job.address))} />
+          {job.landmark ? <Text style={font.muted}>Landmark: {job.landmark}</Text> : null}
+          <Button title="Directions" variant="secondary" onPress={() => void Linking.openURL(directionsUrl(job))} />
         </Card>
       </Section>
 

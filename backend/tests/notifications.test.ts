@@ -6,7 +6,7 @@ import { runBillingJobs } from "../src/billing.ts"
 import { addDays, today } from "../src/dates.ts"
 import { prisma } from "../src/db.ts"
 import { flushPushes } from "../src/notify.ts"
-import { resetDatabase, verifyPhone } from "./helpers.ts"
+import { resetDatabase, verifyPhone, YENAGOA } from "./helpers.ts"
 
 const app = createApp()
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00])
@@ -81,7 +81,7 @@ describe("notifications", () => {
     const { body } = await request(app)
       .post("/orders")
       .set(ada)
-      .send({ type: "INSTANT_PICKUP", address: "12 Allen Avenue", wasteType: "Plastic", bags: 2, asap: true })
+      .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "12 Allen Avenue", wasteType: "Plastic", bags: 2, asap: true })
     const id = body.order.id
     await request(app).post(`/orders/${id}/receipt`).set(ada).attach("receipt", jpeg, { filename: "r.jpg", contentType: "image/jpeg" })
     expect((await inbox(staff)).notifications[0]).toMatchObject({ title: "Receipt to check", url: `/admin/orders/${id}` })
