@@ -2,12 +2,13 @@ import bcrypt from "bcryptjs"
 import { Router } from "express"
 import { z } from "zod"
 import { publicArea } from "../areas.ts"
-import { currentUser, requireAdmin, requireUser } from "../auth.ts"
+import { audit } from "../audit.ts"
+import { currentUser, requireAdmin, requireOwner, requireUser } from "../auth.ts"
 import { autoAssign } from "../assign.ts"
 import { earningsSummary } from "../earnings.ts"
 import { bagsDelivered } from "../stock.ts"
 import { prisma } from "../db.ts"
-import type { Order, Prisma } from "../generated/prisma/client.ts"
+import type { Collector, Order, Prisma } from "../generated/prisma/client.ts"
 import { OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "../generated/prisma/enums.ts"
 import { HttpError } from "../http.ts"
 import { adminCollector, adminOrder, adminSubscription, ticket } from "../serializers.ts"
@@ -165,11 +166,23 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
   if (updated.count === 0) throw new HttpError(409, "This order was just changed by someone else. Refresh and try again.")
   let after = await findOrder(order.id)
   await announceOrderChange(order, after)
+  await audit(currentUser(req), "order.update", { type: "order", id: order.id }, describeOrderChange(order, after))
   if (after.status === "COMPLETED" && order.status !== "COMPLETED") await bagsDelivered(after, currentUser(req).id)
   // Marked as paid without choosing a collector: let auto-assign pick one.
   if (order.status === "AWAITING_PAYMENT" && after.status === "PENDING" && (await autoAssign(after))) after = await findOrder(order.id)
   res.json({ order: adminOrder(after) })
 })
+
+/** "WC-ABC123: pending → assigned, collector Musa Bello", for the audit log. */
+function describeOrderChange(before: Order & { collector: Collector | null }, after: Order & { collector: Collector | null }) {
+  const parts: string[] = []
+  const word = (s: string) => s.toLowerCase().replace("_", " ")
+  if (before.status !== after.status) parts.push(`${word(before.status)} → ${word(after.status)}`)
+  if (before.collectorId !== after.collectorId) parts.push(after.collector ? `collector ${after.collector.name}` : "collector removed")
+  if (before.adminNote !== after.adminNote) parts.push("staff note changed")
+  if (before.customerNote !== after.customerNote) parts.push(`message to customer: "${after.customerNote ?? ""}"`)
+  return `${after.reference}: ${parts.join(", ") || "no change"}`
+}
 
 /** Tells the customer and collectors what a staff change to an order means for them. */
 async function announceOrderChange(before: Order, after: Order) {
@@ -225,6 +238,12 @@ adminRouter.patch("/admin/subscriptions/:id", async (req, res) => {
     })
   })
   if (collectorId && collectorId !== sub.collectorId) await events.planCollectorSet(updated, updated.user.name)
+  await audit(
+    currentUser(req),
+    "plan.collector",
+    { type: "plan", id: sub.id },
+    `${updated.user.name}'s plan: regular collector ${updated.collector?.name ?? "removed"}`,
+  )
   res.json({ subscription: adminSubscription(updated) })
 })
 
@@ -238,6 +257,7 @@ adminRouter.get("/admin/collectors", async (_req, res) => {
 
 adminRouter.post("/admin/collectors", async (req, res) => {
   const collector = await prisma.collector.create({ data: { ...collectorSchema.parse(req.body), approvedAt: new Date() } })
+  await audit(currentUser(req), "collector.add", { type: "collector", id: collector.id }, `Added collector ${collector.name} (${collector.phone})`)
   res.status(201).json({ collector: adminCollector(collector) })
 })
 
@@ -266,6 +286,8 @@ adminRouter.patch("/admin/collectors/:id", async (req, res) => {
     }
     return tx.collector.update({ where: { id: existing.id }, data })
   })
+  const what = data.active === false && existing.active ? "Deactivated" : data.active && !existing.active ? "Reactivated" : "Edited"
+  await audit(currentUser(req), "collector.edit", { type: "collector", id: existing.id }, `${what} collector ${updated.name}`)
   res.json({ collector: adminCollector(updated) })
 })
 
@@ -276,6 +298,7 @@ adminRouter.post("/admin/collectors/:id/approve", async (req, res) => {
     data: { approvedAt: collector.approvedAt ?? new Date(), active: true },
   })
   if (!collector.approvedAt && approved.userId) await events.collectorApproved(approved.userId)
+  await audit(currentUser(req), "collector.approve", { type: "collector", id: collector.id }, `Approved collector ${collector.name} (${collector.phone})`)
   res.json({ collector: adminCollector(approved) })
 })
 
@@ -293,6 +316,7 @@ adminRouter.post("/admin/collectors/:id/reject", async (req, res) => {
       await tx.collector.update({ where: { id: collector.id }, data: { approvedAt: new Date() } })
     }
   })
+  await audit(currentUser(req), "collector.reject", { type: "collector", id: collector.id }, `Rejected collector application from ${collector.name} (${collector.phone})`)
   res.json({ ok: true })
 })
 
@@ -316,6 +340,7 @@ adminRouter.put("/admin/collectors/:id/login", async (req, res) => {
       await tx.collector.update({ where: { id: collector.id }, data: { userId: user.id } })
     })
   }
+  await audit(currentUser(req), "collector.login", { type: "collector", id: collector.id }, `Set the app password for ${collector.name}`)
   res.json({ collector: adminCollector(await findCollector(collector.id)) })
 })
 
@@ -326,7 +351,7 @@ adminRouter.get("/admin/collectors/:id/earnings", async (req, res) => {
 })
 
 // Record that a collector was paid for all their unpaid completed jobs.
-adminRouter.post("/admin/collectors/:id/payouts", async (req, res) => {
+adminRouter.post("/admin/collectors/:id/payouts", requireOwner, async (req, res) => {
   const { note } = z.object({ note: z.string().trim().max(200).optional() }).parse(req.body ?? {})
   const collector = await findCollector(req.params.id)
   const payout = await prisma.$transaction(async (tx) => {
@@ -345,6 +370,12 @@ adminRouter.post("/admin/collectors/:id/payouts", async (req, res) => {
     return created
   })
   await events.payoutRecorded(collector.id, payout.amount, payout.jobs)
+  await audit(
+    currentUser(req),
+    "collector.payout",
+    { type: "collector", id: collector.id },
+    `Paid ${collector.name} ₦${payout.amount.toLocaleString("en-NG")} for ${payout.jobs} jobs${payout.note ? ` (${payout.note})` : ""}`,
+  )
   res.status(201).json({ payout, earnings: await earningsSummary(collector.id) })
 })
 
@@ -352,6 +383,7 @@ adminRouter.post("/admin/collectors/:id/payouts", async (req, res) => {
 adminRouter.delete("/admin/collectors/:id/login", async (req, res) => {
   const collector = await findCollector(req.params.id)
   if (collector.userId) await prisma.user.delete({ where: { id: collector.userId } })
+  await audit(currentUser(req), "collector.login_removed", { type: "collector", id: collector.id }, `Removed the app login for ${collector.name}`)
   res.json({ collector: adminCollector(await findCollector(collector.id)) })
 })
 
@@ -376,13 +408,20 @@ adminRouter.get("/admin/areas", async (_req, res) => {
 })
 
 // Launch or pause an area, or change how far it reaches.
-adminRouter.patch("/admin/areas/:id", async (req, res) => {
+adminRouter.patch("/admin/areas/:id", requireOwner, async (req, res) => {
   const body = updateAreaSchema.parse(req.body)
   const area = await prisma.serviceArea.findUnique({ where: { id: String(req.params.id) } })
   if (!area) throw new HttpError(404, "Area not found.")
   const updated = await prisma.serviceArea.update({ where: { id: area.id }, data: body })
   // Tell everyone who asked to be notified, the first time an area opens.
   if (body.active && !area.active) await events.areaLaunched(updated)
+  const changes = [
+    body.active !== undefined && body.active !== area.active ? (body.active ? "launched" : "paused") : null,
+    body.radiusKm !== undefined ? `reach ${body.radiusKm} km` : null,
+    body.autoAssign !== undefined ? `auto-assign ${body.autoAssign ? "on" : "off"}` : null,
+    body.dailyCapacity !== undefined ? `daily limit ${body.dailyCapacity ?? "none"}` : null,
+  ].filter(Boolean)
+  await audit(currentUser(req), "area.update", { type: "area", id: area.id }, `${area.name}: ${changes.join(", ") || "no change"}`)
   res.json({ area: publicArea(updated) })
 })
 
@@ -402,6 +441,9 @@ adminRouter.patch("/admin/support-tickets/:id", async (req, res) => {
   const existing = await prisma.supportTicket.findUnique({ where: { id: req.params.id } })
   if (!existing) throw new HttpError(404, "Ticket not found.")
   const updated = await prisma.supportTicket.update({ where: { id: existing.id }, data: { status } })
-  if (status !== existing.status) await events.ticketUpdated(existing.userId, existing.reference, status)
+  if (status !== existing.status) {
+    await events.ticketUpdated(existing.userId, existing.reference, status)
+    await audit(currentUser(req), "ticket.status", { type: "ticket", id: existing.id }, `${existing.reference}: ${status.toLowerCase().replace("_", " ")}`)
+  }
   res.json({ ticket: ticket(updated) })
 })

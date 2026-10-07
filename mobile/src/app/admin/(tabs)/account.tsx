@@ -14,6 +14,7 @@ export default function AdminAccount() {
   const [temporary, setTemporary] = useState("")
   const [done, setDone] = useState<string | null>(null)
   const help = useSubmit()
+  const owner = user?.staffRole === "OWNER"
 
   function setTemporaryPassword() {
     confirmAction(
@@ -36,34 +37,36 @@ export default function AdminAccount() {
       <Card>
         <Text style={font.heading}>{user?.name}</Text>
         <Row label="Phone" value={user?.phone ?? ""} />
-        <Row label="Role" value="Admin" />
+        <Row label="Role" value={owner ? "Main admin" : "Staff"} />
       </Card>
 
       <Button title="Service areas" variant="secondary" onPress={() => router.push("/admin/areas")} />
 
-      <Section title="Help someone who's locked out">
-        <Text style={font.muted}>
-          Customers and collectors can reset their own password with a code by SMS. If that doesn't reach them, check who
-          they are on a call, then set a temporary password here.
-        </Text>
-        {help.error ? <ErrorBanner message={help.error} /> : null}
-        {done ? <Text style={[font.label, { color: colors.primary }]}>{done}</Text> : null}
-        <TextField label="Their phone number" placeholder="08012345678" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-        <TextField
-          label="Temporary password"
-          value={temporary}
-          onChangeText={setTemporary}
-          autoCapitalize="none"
-          hint="At least 8 characters."
-        />
-        <Button
-          title="Set temporary password"
-          variant="secondary"
-          loading={help.busy}
-          disabled={phone.trim().length < 10 || temporary.length < 8}
-          onPress={setTemporaryPassword}
-        />
-      </Section>
+      {owner ? (
+        <Section title="Help someone who's locked out">
+          <Text style={font.muted}>
+            Customers and collectors can reset their own password with a code by SMS. If that doesn't reach them, check who
+            they are on a call, then set a temporary password here.
+          </Text>
+          {help.error ? <ErrorBanner message={help.error} /> : null}
+          {done ? <Text style={[font.label, { color: colors.primary }]}>{done}</Text> : null}
+          <TextField label="Their phone number" placeholder="08012345678" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+          <TextField
+            label="Temporary password"
+            value={temporary}
+            onChangeText={setTemporary}
+            autoCapitalize="none"
+            hint="At least 8 characters."
+          />
+          <Button
+            title="Set temporary password"
+            variant="secondary"
+            loading={help.busy}
+            disabled={phone.trim().length < 10 || temporary.length < 8}
+            onPress={setTemporaryPassword}
+          />
+        </Section>
+      ) : null}
 
       <Button title="Change my password" variant="secondary" onPress={() => router.push("/change-password")} />
       <Button

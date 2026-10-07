@@ -1,4 +1,4 @@
-import type { Collector, Order, OrderStatus, OrderType, SubscriptionStatus, TicketStatus, TimeWindow } from "./types"
+import type { Collector, DisposalKind, Order, OrderStatus, OrderType, QuoteStatus, SubscriptionStatus, TicketStatus, TimeWindow } from "./types"
 
 export function naira(amount: number): string {
   return `₦${amount.toLocaleString("en-NG")}`
@@ -27,6 +27,7 @@ export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   INSTANT_PICKUP: "Instant pickup",
   PLAN_PICKUP: "Plan pickup",
   WASTE_BAGS: "Waste bags",
+  SPECIAL_PICKUP: "Special pickup",
 }
 
 type Tone = "warning" | "info" | "success" | "danger" | "muted"
@@ -86,6 +87,7 @@ export function hourLabel(hour: number): string {
 export function orderSummary(order: Pick<Order, "type" | "planLabel" | "quantity">): string {
   if (order.type === "INSTANT_PICKUP") return `${order.quantity} bag${order.quantity === 1 ? "" : "s"}`
   if (order.type === "WASTE_BAGS") return `${order.planLabel} bags × ${order.quantity}`
+  if (order.type === "SPECIAL_PICKUP") return "Quoted pickup"
   return order.planLabel
 }
 
@@ -103,3 +105,18 @@ export function pickupWhen(order: Pick<Order, "asap" | "scheduledDate"> & { time
 
 /** Collectors that can be given jobs: active, and approved if they signed up themselves. */
 export const assignable = (c: Collector) => c.active && !c.pending
+
+export const QUOTE_STATUS: Record<QuoteStatus, { label: string; tone: Tone }> = {
+  NEW: { label: "Waiting for a price", tone: "warning" },
+  QUOTED: { label: "Price ready", tone: "info" },
+  ACCEPTED: { label: "Accepted", tone: "success" },
+  DECLINED: { label: "Declined", tone: "muted" },
+  CANCELLED: { label: "Closed", tone: "muted" },
+}
+
+export const DISPOSAL_KIND_LABELS: Record<DisposalKind, string> = {
+  LANDFILL: "Dump site",
+  RECYCLER: "Recycler",
+  COMPOST: "Compost",
+  OTHER: "Other",
+}

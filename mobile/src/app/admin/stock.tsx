@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Text, View } from "react-native"
 import { Badge, Button, Card, Chip, ErrorBanner, Loading, Row, Screen, Section, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
+import { useIsOwner } from "../../lib/auth"
 import { formatDate } from "../../lib/format"
 import type { StockSize } from "../../lib/types"
 import { useFocusData } from "../../lib/useFocusData"
@@ -19,6 +20,7 @@ export default function Stock() {
   const [reason, setReason] = useState("")
   const [lowAt, setLowAt] = useState("")
   const { busy, error: saveError, submit } = useSubmit()
+  const owner = useIsOwner()
 
   if (!data) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
   const count = Number(packs.replace(/\D/g, ""))
@@ -77,7 +79,7 @@ export default function Stock() {
           <Card>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
               <Chip label="Add (restock)" selected={direction === "in"} onPress={() => setDirection("in")} />
-              <Chip label="Remove (damaged, lost)" selected={direction === "out"} onPress={() => setDirection("out")} />
+              {owner ? <Chip label="Remove (damaged, lost)" selected={direction === "out"} onPress={() => setDirection("out")} /> : null}
             </View>
             <TextField label="Packs" keyboardType="number-pad" value={packs} onChangeText={setPacks} />
             <TextField
@@ -87,13 +89,15 @@ export default function Stock() {
               onChangeText={setReason}
               maxLength={200}
             />
-            <TextField
-              label="Warn when available falls to (optional)"
-              keyboardType="number-pad"
-              value={lowAt}
-              onChangeText={setLowAt}
-              hint={selected && tracked(selected) ? `Now ${selected.lowAt} packs.` : "Default 20 packs."}
-            />
+            {owner ? (
+              <TextField
+                label="Warn when available falls to (optional)"
+                keyboardType="number-pad"
+                value={lowAt}
+                onChangeText={setLowAt}
+                hint={selected && tracked(selected) ? `Now ${selected.lowAt} packs.` : "Default 20 packs."}
+              />
+            ) : null}
             {saveError ? <ErrorBanner message={saveError} /> : null}
             <Button title="Save" loading={busy} disabled={!count || reason.trim().length < 2} onPress={save} />
           </Card>

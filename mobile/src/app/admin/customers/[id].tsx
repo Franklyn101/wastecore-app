@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Linking, Pressable, Text, View } from "react-native"
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api } from "../../../lib/api"
+import { useIsOwner } from "../../../lib/auth"
 import { confirmAction } from "../../../lib/dialogs"
 import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus, SUBSCRIPTION_STATUS } from "../../../lib/format"
 import { useFocusData } from "../../../lib/useFocusData"
@@ -15,6 +16,7 @@ export default function CustomerDetails() {
   const [reason, setReason] = useState("")
   const [suspending, setSuspending] = useState(false)
   const action = useSubmit()
+  const owner = useIsOwner()
 
   if (!data) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
   const { customer: c } = data
@@ -46,17 +48,19 @@ export default function CustomerDetails() {
         <Card style={{ backgroundColor: colors.dangerSoft, borderColor: colors.danger }}>
           <Text style={font.label}>Suspended on {formatDate(c.suspendedAt)}</Text>
           {c.suspendedReason ? <Text style={font.body}>{c.suspendedReason}</Text> : null}
-          <Button
-            title="Restore account"
-            variant="secondary"
-            loading={action.busy}
-            onPress={() =>
-              void action.submit(async () => {
-                await api.admin.restoreCustomer(c.id)
-                refresh()
-              })
-            }
-          />
+          {owner ? (
+            <Button
+              title="Restore account"
+              variant="secondary"
+              loading={action.busy}
+              onPress={() =>
+                void action.submit(async () => {
+                  await api.admin.restoreCustomer(c.id)
+                  refresh()
+                })
+              }
+            />
+          ) : null}
         </Card>
       ) : null}
 
@@ -104,7 +108,7 @@ export default function CustomerDetails() {
       </Section>
 
       {action.error ? <ErrorBanner message={action.error} /> : null}
-      {!c.suspendedAt && !suspending ? (
+      {owner && !c.suspendedAt && !suspending ? (
         <Button title="Suspend account" variant="danger" onPress={() => setSuspending(true)} />
       ) : null}
       {suspending && !c.suspendedAt ? (

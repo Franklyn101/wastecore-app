@@ -24,7 +24,7 @@ const login = (phone: string, password: string) => request(app).post("/auth/logi
 async function setup() {
   const customer = await register("08012345678", "Ada Obi")
   const admin = await register("08099990000", "Staff")
-  await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
+  await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN", staffRole: "OWNER" } })
 
   const created = await request(app)
     .post("/orders")
@@ -155,7 +155,7 @@ describe("collector self sign-up", () => {
 
   async function staff(): Promise<Auth> {
     const admin = await register("08099990000", "Staff")
-    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
+    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN", staffRole: "OWNER" } })
     return admin
   }
 

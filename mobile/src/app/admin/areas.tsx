@@ -3,6 +3,7 @@ import { Switch, Text, View } from "react-native"
 import { MapView } from "../../components/MapView"
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
+import { useIsOwner } from "../../lib/auth"
 import { confirmAction } from "../../lib/dialogs"
 import type { AdminArea } from "../../lib/types"
 import { useFocusData } from "../../lib/useFocusData"
@@ -14,6 +15,7 @@ export default function AdminAreas() {
   const { data, error, refreshing, refresh, setData } = useFocusData(() => api.admin.areas().then((r) => r.areas))
   const [selected, setSelected] = useState<string | null>(null)
   const action = useSubmit()
+  const owner = useIsOwner()
 
   if (!data) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
 
@@ -40,6 +42,7 @@ export default function AdminAreas() {
       <Text style={font.muted}>
         Bookings are only accepted inside a live area. Customers outside one can tap "Notify me"; they're counted below.
       </Text>
+      {!owner ? <Text style={font.muted}>Only the main admin can change areas.</Text> : null}
       {focus ? <MapView center={{ lat: focus.centerLat, lng: focus.centerLng }} zoom={10} areas={data} height={240} /> : null}
       {action.error ? <ErrorBanner message={action.error} /> : null}
       {data.map((area) => (
@@ -57,7 +60,7 @@ export default function AdminAreas() {
               value={area.active}
               onValueChange={(v) => toggle(area, v)}
               trackColor={{ true: colors.primary }}
-              disabled={action.busy}
+              disabled={action.busy || !owner}
             />
           </View>
           <Row label="Saved addresses" value={String(area.savedAddresses)} />
@@ -68,13 +71,13 @@ export default function AdminAreas() {
             <Button
               title="−"
               variant="secondary"
-              disabled={action.busy || area.radiusKm <= 1}
+              disabled={action.busy || !owner || area.radiusKm <= 1}
               onPress={() => save(area, { radiusKm: Math.max(1, area.radiusKm - 5) })}
             />
             <Button
               title="+"
               variant="secondary"
-              disabled={action.busy || area.radiusKm >= 100}
+              disabled={action.busy || !owner || area.radiusKm >= 100}
               onPress={() => save(area, { radiusKm: Math.min(100, area.radiusKm + 5) })}
             />
           </View>
@@ -88,10 +91,14 @@ export default function AdminAreas() {
               value={area.autoAssign}
               onValueChange={(v) => save(area, { autoAssign: v })}
               trackColor={{ true: colors.primary }}
-              disabled={action.busy}
+              disabled={action.busy || !owner}
             />
           </View>
-          <CapacityField area={area} busy={action.busy} onSave={(dailyCapacity) => save(area, { dailyCapacity })} />
+          {owner ? (
+            <CapacityField area={area} busy={action.busy} onSave={(dailyCapacity) => save(area, { dailyCapacity })} />
+          ) : (
+            <Row label="Pickups per day (limit)" value={area.dailyCapacity ? String(area.dailyCapacity) : "No limit"} />
+          )}
           <Text style={[font.muted, { color: colors.primary }]} onPress={() => setSelected(area.id)}>
             Show on map
           </Text>

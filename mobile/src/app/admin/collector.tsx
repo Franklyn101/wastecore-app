@@ -4,6 +4,7 @@ import { Switch, Text, View } from "react-native"
 import { AreaChips } from "../../components/AreaChips"
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
+import { useIsOwner } from "../../lib/auth"
 import { confirmAction } from "../../lib/dialogs"
 import { formatDate, naira } from "../../lib/format"
 import type { Earnings } from "../../lib/types"
@@ -25,6 +26,7 @@ export default function CollectorEditor() {
   const [loginSaved, setLoginSaved] = useState<string | null>(null)
   const { busy, error, submit } = useSubmit()
   const access = useSubmit()
+  const owner = useIsOwner()
 
   useEffect(() => {
     if (!id) return
@@ -82,7 +84,7 @@ export default function CollectorEditor() {
       ) : null}
       <Button title={id ? "Save changes" : "Add collector"} onPress={save} loading={busy} disabled={!ready} />
 
-      {id ? <CollectorPay id={id} name={name} /> : null}
+      {id && owner ? <CollectorPay id={id} name={name} /> : null}
 
       {id ? (
         <Card>

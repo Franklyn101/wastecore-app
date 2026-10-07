@@ -5,7 +5,7 @@ import { HttpError } from "./http.ts"
 // Each area can cap how many pickups it takes per day, so collectors aren't overbooked.
 // Plan pickups count toward the cap but are never refused (they were paid for in advance).
 
-const pickupTypes = ["INSTANT_PICKUP", "PLAN_PICKUP"] as const
+const pickupTypes = ["INSTANT_PICKUP", "PLAN_PICKUP", "SPECIAL_PICKUP"] as const
 
 /** Pickups booked per day in an area, for the days in [from, from + days). */
 async function bookings(areaId: string, from: Date, days: number) {

@@ -174,7 +174,10 @@ ordersRouter.post("/orders/:id/cancel", async (req, res) => {
 /** A pickup the customer can still move or skip: booked, not yet done, and the collector hasn't set off. */
 function assertChangeable(order: Order) {
   if (order.type === "WASTE_BAGS") throw new HttpError(409, "Bag deliveries can't be rescheduled in the app. Please contact support.")
-  const open = order.status === "PENDING" || order.status === "ASSIGNED" || (order.status === "AWAITING_PAYMENT" && order.type === "INSTANT_PICKUP")
+  const open =
+    order.status === "PENDING" ||
+    order.status === "ASSIGNED" ||
+    (order.status === "AWAITING_PAYMENT" && (order.type === "INSTANT_PICKUP" || order.type === "SPECIAL_PICKUP"))
   if (!open) throw new HttpError(409, "This pickup can no longer be changed.")
   if (order.onTheWayAt) throw new HttpError(409, "Your collector is already on the way. Call them or contact support.")
   if (ymd(order.scheduledDate) < todayInLagos()) throw new HttpError(409, "This pickup's date has passed. Please contact support.")

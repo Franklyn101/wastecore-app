@@ -36,7 +36,7 @@ export default function Home() {
   const cheapestPremium = premium.length ? Math.min(...premium.map((p) => p.price)) : null
   const cheapestBags = catalog ? Math.min(...catalog.bagSizes.map((b) => b.price)) : null
 
-  // The same five services as the WhatsApp bot's main menu.
+  // The WhatsApp bot's five services, plus quotes for special waste.
   const services: Service[] = [
     {
       title: "Instant pickup",
@@ -61,6 +61,12 @@ export default function Home() {
       subtitle: cheapestBags ? `From ${naira(cheapestBags)}/pack` : "Packs of 10",
       icon: "bag-handle-outline",
       href: "/book/bags",
+    },
+    {
+      title: "Special waste",
+      subtitle: "Rubble, furniture, e-waste: get a quote",
+      icon: "construct-outline",
+      href: "/quotes",
     },
     {
       title: "Support",

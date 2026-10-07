@@ -90,3 +90,6 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider")
   return ctx
 }
+
+/** The main admin, who can also handle money, accounts and settings. */
+export const useIsOwner = () => useAuth().user?.staffRole === "OWNER"

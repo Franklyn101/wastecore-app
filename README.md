@@ -68,7 +68,13 @@ More staff tools:
 - **Bag stock.** Staff add stock per bag size (and write off damaged packs). Packs come out of stock when a bag order is delivered, orders larger than what's available are refused, and staff are warned when a size runs low. Sizes without stock entered aren't limited.
 - **Reports.** CSV downloads of orders, payments, refunds, collector payouts and new customers for the last 7, 30, 90 or 365 days. They open in Excel or Google Sheets.
 
-Admin accounts are created with `npm run db:create-admin` (see below). The server checks the role on every admin request; a customer who opens an admin link gets nothing.
+**Staff roles.** There are two kinds of admin account. **Main admins** can do everything. **Staff** run the day: orders, collectors, plans, tickets, quotes and restocking. Only main admins can refund, suspend customers, record collector payouts, change service areas, write off stock, set temporary passwords, download reports, see money on the Overview, manage staff (**Overview → Staff and access**) and read the **Activity log**. The log records who did what: order changes, refunds, suspensions, payouts, area and stock changes, collector approvals and quote prices. There is always at least one main admin.
+
+**Special waste quotes.** For waste that doesn't fit in bags (building rubble, furniture, e-waste, garden waste, event clean-ups, clear-outs), customers tap **Special waste** on the home screen. They describe it, add a photo, pick an address and a day, and staff send a price with a note on what it covers. The customer accepts (which creates a special pickup to pay for like any order) or declines. Staff can also close a request they can't take on, with a message.
+
+**Waste records.** Collectors can enter the weight when completing a pickup, and log every drop-off (site, dump site / recycler / compost, main waste type, weight, ticket number, photo). **Overview → Waste report** shows what was collected by waste type and area, where it went, and the share kept out of the dump site. Drop-offs are also in the CSV reports.
+
+Admin accounts are created with `npm run db:create-admin` (see below); it creates a main admin, who adds other staff in the app. The server checks the role on every admin request; a customer who opens an admin link gets nothing.
 
 ## Collector app
 
@@ -194,7 +200,8 @@ Demo accounts (created automatically):
 
 | Role | Phone | Password |
 | --- | --- | --- |
-| Staff | 08090000001 | staff-password-123 |
+| Main admin | 08090000001 | staff-password-123 |
+| Staff | 08090000002 | staff-password-123 |
 | Customer | 08035551234 | customer-pass-1 |
 | Collector | 07011112222 | collector-pass-1 |
 
@@ -314,6 +321,15 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | GET / POST | `/admin/stock`, `/admin/stock/:size` | admin | Stock levels and recent changes; `{ change, reason, lowAt? }` to restock or write off |
 | GET | `/admin/exports/:kind.csv?from=&to=` | admin | CSV of `orders`, `payments`, `refunds`, `payouts` or `customers` |
 | GET | `/areas/:id/full-days` | public | Days an area is fully booked |
+| GET / POST / PATCH | `/admin/staff`, `/admin/staff/:id` | main admin | List and add staff; `{ staffRole?, disabled? }` |
+| GET | `/admin/audit?q=&targetType=&targetId=` | main admin | Activity log |
+| POST / GET | `/quotes`, `/quotes/:id` | customer | Multipart `{ category, description, addressId, preferredDate, photo? }`; list and view |
+| POST | `/quotes/:id/accept`, `/quotes/:id/decline` | customer | Accepting creates a special pickup order to pay for |
+| GET | `/admin/quotes?status=`, `/admin/quotes/:id` | admin | Quote requests |
+| POST | `/admin/quotes/:id/quote`, `/admin/quotes/:id/cancel` | admin | `{ amount, note? }` sends a price; `{ note }` closes the request |
+| POST / GET | `/collector/disposals` | collector | Log a drop-off (multipart, optional photo); recent ones and sites |
+| POST / GET | `/admin/disposals` | admin | The same for staff |
+| GET | `/admin/reports/waste?from=&to=` | admin | Collected and disposed waste, by type, area and site |
 | GET / PATCH | `/admin/support-tickets?status=` | admin | View and update tickets |
 | POST | `/admin/collectors/:id/approve` | admin | Approves a collector who applied in the app |
 | POST | `/admin/collectors/:id/reject` | admin | Turns down an application and removes its login |
@@ -357,3 +373,6 @@ Set `EXPO_PUBLIC_API_URL` to the production API URL in your EAS environment.
 ## Next steps
 
 - **Deploy** the API and database, and turn on Cloudinary, so the team can test on real phones.
+- **Set real numbers** before launch: collector pay rates (`COLLECTOR_PAY`), each area's daily limit and auto-assign, and starting bag stock.
+- **Map tiles**: switch to a hosted tile provider before heavy use (see "Service areas, addresses and maps").
+- **Port Harcourt and Lagos**: check their centres and reach in **Service areas**, then launch them from the app when ready. Everyone who tapped "Notify me" there is told.

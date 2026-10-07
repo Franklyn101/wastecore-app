@@ -1,7 +1,8 @@
 import { Router, type Response } from "express"
 import { z } from "zod"
 import { autoAssignDue } from "../assign.ts"
-import { currentUser, requireAdmin, requireUser } from "../auth.ts"
+import { audit } from "../audit.ts"
+import { currentUser, isOwner, requireAdmin, requireOwner, requireUser } from "../auth.ts"
 import { bagSizeIds, findBagSize } from "../catalog.ts"
 import { addDays, startOfLagosDay, toDay, today, ymd } from "../dates.ts"
 import { prisma } from "../db.ts"
@@ -30,7 +31,7 @@ async function revenueSince(from: Date) {
   return (online._sum.amount ?? 0) + (transfers._sum.amount ?? 0) + (cash._sum.extraAmount ?? 0) - (refunds._sum.amount ?? 0)
 }
 
-operationsRouter.get("/admin/dashboard", async (_req, res) => {
+operationsRouter.get("/admin/dashboard", async (req, res) => {
   const day = today()
   const dayStart = startOfLagosDay(day)
   const [due, done, notDone, unassigned, waitingPayment, revenueToday, revenue7, revenue30, plans, newCustomers, onDuty, tickets, ratings, areas] =
@@ -63,7 +64,8 @@ operationsRouter.get("/admin/dashboard", async (_req, res) => {
   )
   res.json({
     today: { due, done, notDone, unassigned, waitingPayment },
-    revenue: { today: revenueToday, last7Days: revenue7, last30Days: revenue30 },
+    // Money is for the main admin.
+    revenue: isOwner(currentUser(req)) ? { today: revenueToday, last7Days: revenue7, last30Days: revenue30 } : null,
     activePlans: plans,
     newCustomers7Days: newCustomers,
     collectorsOnDuty: onDuty,
@@ -71,12 +73,15 @@ operationsRouter.get("/admin/dashboard", async (_req, res) => {
     rating: { average: ratings._avg.rating ? Math.round(ratings._avg.rating * 10) / 10 : null, count: ratings._count.rating },
     areas: perArea,
     stock: (await stockLevels()).filter((s) => s.available <= s.lowAt),
+    quotesWaiting: await prisma.quoteRequest.count({ where: { status: "NEW" } }),
   })
 })
 
 // Give waiting paid orders (due by tomorrow) to on-duty collectors, in areas with auto-assign on.
-operationsRouter.post("/admin/auto-assign", async (_req, res) => {
-  res.json({ assigned: await autoAssignDue(addDays(today(), 1)) })
+operationsRouter.post("/admin/auto-assign", async (req, res) => {
+  const assigned = await autoAssignDue(addDays(today(), 1))
+  if (assigned) await audit(currentUser(req), "orders.auto_assign", { type: "order" }, `Auto-assigned ${assigned} waiting order${assigned === 1 ? "" : "s"}`)
+  res.json({ assigned })
 })
 
 // ── Customers ──────────────────────────────────────────────
@@ -148,18 +153,20 @@ operationsRouter.get("/admin/customers/:id", async (req, res) => {
   })
 })
 
-operationsRouter.post("/admin/customers/:id/suspend", async (req, res) => {
+operationsRouter.post("/admin/customers/:id/suspend", requireOwner, async (req, res) => {
   const { reason } = z.object({ reason: z.string().trim().min(3, "Say why the account is being suspended.").max(300) }).parse(req.body)
   const user = await findCustomer(req.params.id)
   await prisma.user.update({ where: { id: user.id }, data: { suspendedAt: new Date(), suspendedReason: reason } })
   // Stop pushes to their phones while suspended.
   await prisma.pushToken.deleteMany({ where: { userId: user.id } })
+  await audit(currentUser(req), "customer.suspend", { type: "customer", id: user.id }, `Suspended ${user.name} (${user.phone}): ${reason}`)
   res.json({ ok: true })
 })
 
-operationsRouter.post("/admin/customers/:id/restore", async (req, res) => {
+operationsRouter.post("/admin/customers/:id/restore", requireOwner, async (req, res) => {
   const user = await findCustomer(req.params.id)
   await prisma.user.update({ where: { id: user.id }, data: { suspendedAt: null, suspendedReason: null } })
+  await audit(currentUser(req), "customer.restore", { type: "customer", id: user.id }, `Restored ${user.name} (${user.phone})`)
   res.json({ ok: true })
 })
 
@@ -173,7 +180,7 @@ async function refundable(orderId: string) {
   return { order, paid, refunded, left: paid - refunded }
 }
 
-operationsRouter.post("/admin/orders/:id/refund", async (req, res) => {
+operationsRouter.post("/admin/orders/:id/refund", requireOwner, async (req, res) => {
   const body = z
     .object({
       amount: z.number().int().min(100, "Refund at least ₦100."),
@@ -213,10 +220,16 @@ operationsRouter.post("/admin/orders/:id/refund", async (req, res) => {
     await events.cancelledByStaff({ ...order, status: "CANCELLED" })
   }
   await events.refunded(order, refund.amount, refund.method)
+  await audit(
+    currentUser(req),
+    "order.refund",
+    { type: "order", id: order.id },
+    `Refunded ₦${refund.amount.toLocaleString("en-NG")} on ${order.reference} (${refund.method === "PAYSTACK" ? "Paystack" : "manual"}): ${body.reason}`,
+  )
   res.status(201).json({ refund, left: left - refund.amount })
 })
 
-operationsRouter.get("/admin/refunds", async (_req, res) => {
+operationsRouter.get("/admin/refunds", requireOwner, async (_req, res) => {
   const refunds = await prisma.refund.findMany({
     orderBy: { createdAt: "desc" },
     take: 200,
@@ -248,6 +261,10 @@ operationsRouter.post("/admin/stock/:size", async (req, res) => {
       lowAt: z.number().int().min(0).max(10000).optional(),
     })
     .parse(req.body)
+  // Staff can restock; writing stock off (or changing the warning level) is for the main admin.
+  if ((body.change < 0 || body.lowAt !== undefined) && !isOwner(currentUser(req))) {
+    throw new HttpError(403, "Only the main admin can remove stock or change the warning level.")
+  }
   await prisma.$transaction(async (tx) => {
     const row = await tx.bagStock.upsert({
       where: { size },
@@ -257,6 +274,12 @@ operationsRouter.post("/admin/stock/:size", async (req, res) => {
     if (row.packs < 0) throw new HttpError(400, "Stock can't go below zero.")
     if (body.change) await tx.stockMovement.create({ data: { size, change: body.change, reason: body.reason, createdById: currentUser(req).id } })
   })
+  await audit(
+    currentUser(req),
+    "stock.change",
+    { type: "stock", id: size },
+    `${body.change >= 0 ? "Added" : "Removed"} ${Math.abs(body.change)} packs of ${findBagSize(size)!.name.toLowerCase()} bags: ${body.reason}`,
+  )
   res.json({ sizes: await stockLevels() })
 })
 
@@ -281,9 +304,10 @@ const rangeSchema = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 })
 
-operationsRouter.get("/admin/exports/:kind.csv", async (req, res) => {
-  const kind = z.enum(["orders", "payments", "customers", "payouts", "refunds"]).parse(req.params.kind)
+operationsRouter.get("/admin/exports/:kind.csv", requireOwner, async (req, res) => {
+  const kind = z.enum(["orders", "payments", "customers", "payouts", "refunds", "disposals"]).parse(req.params.kind)
   const range = rangeSchema.parse(req.query)
+  await audit(currentUser(req), "export.csv", { type: "export", id: kind }, `Downloaded the ${kind} report`)
   const from = range.from ? startOfLagosDay(toDay(range.from)) : startOfLagosDay(addDays(today(), -29))
   const to = range.to ? startOfLagosDay(addDays(toDay(range.to), 1)) : startOfLagosDay(addDays(today(), 1))
   const created = { gte: from, lt: to }
@@ -298,10 +322,10 @@ operationsRouter.get("/admin/exports/:kind.csv", async (req, res) => {
     return sendCsv(
       res,
       file,
-      ["Reference", "Created", "Type", "Plan or size", "Status", "Customer", "Phone", "Area", "Address", "Scheduled", "Bags/packs", "Bags collected", "Amount", "Extra", "Paid by", "Paid at", "Collector", "Completed", "Rating"],
+      ["Reference", "Created", "Type", "Plan or size", "Status", "Customer", "Phone", "Area", "Address", "Scheduled", "Bags/packs", "Bags collected", "Weight (kg)", "Amount", "Extra", "Paid by", "Paid at", "Collector", "Completed", "Rating"],
       orders.map((o) => [
         o.reference, o.createdAt, o.type, o.plan, o.status, o.user.name, o.user.phone, o.area?.name, o.address, ymd(o.scheduledDate),
-        o.quantity, o.bagsCollected, o.amount, o.extraAmount || "", o.paymentMethod, o.paidAt, o.collector?.name, o.completedAt, o.rating,
+        o.quantity, o.bagsCollected, o.weightKg, o.amount, o.extraAmount || "", o.paymentMethod, o.paidAt, o.collector?.name, o.completedAt, o.rating,
       ]),
     )
   }
@@ -346,6 +370,15 @@ operationsRouter.get("/admin/exports/:kind.csv", async (req, res) => {
       file,
       ["Paid at", "Collector", "Phone", "Jobs", "Amount", "Note"],
       payouts.map((p) => [p.createdAt, p.collector.name, p.collector.phone, p.jobs, p.amount, p.note]),
+    )
+  }
+  if (kind === "disposals") {
+    const disposals = await prisma.disposal.findMany({ where: { disposedAt: created }, include: { collector: true, area: true }, orderBy: { disposedAt: "asc" } })
+    return sendCsv(
+      res,
+      file,
+      ["Disposed at", "Site", "Kind", "Waste type", "Weight (kg)", "Ticket", "Collector", "Area", "Note"],
+      disposals.map((d) => [d.disposedAt, d.site, d.kind, d.wasteType, d.weightKg, d.ticketNo, d.collector?.name, d.area?.name, d.note]),
     )
   }
   const refunds = await prisma.refund.findMany({ where: { createdAt: created }, include: { order: true, user: true }, orderBy: { createdAt: "asc" } })

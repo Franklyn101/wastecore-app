@@ -187,6 +187,7 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
 
 function orderDescription(o: Order) {
   if (o.type === "WASTE_BAGS") return `${planLabel(o.plan)} bags × ${o.quantity}`
+  if (o.type === "SPECIAL_PICKUP") return `Special pickup: ${o.wasteType}`
   return `Instant pickup, ${o.quantity} bag${o.quantity === 1 ? "" : "s"}`
 }
 

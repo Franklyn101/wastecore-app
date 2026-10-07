@@ -120,7 +120,19 @@ export const COLLECTOR_PAY = {
   pickup: 300, // each pickup (instant or plan)
   perBag: 50, // plus this for every bag collected
   bagDelivery: 200, // delivering a pack order
+  specialPickup: 1500, // a quoted special-waste pickup
 } as const
+
+// Waste that doesn't fit in bags, priced by staff after seeing a description and photo.
+export const SPECIAL_WASTE_CATEGORIES = [
+  "Building rubble",
+  "Furniture or bulky items",
+  "Electronics (e-waste)",
+  "Garden waste",
+  "Event clean-up",
+  "Shop or office clear-out",
+  "Other",
+] as const
 
 // When in the day a pickup happens. Customers may also leave it as "any time".
 export const TIME_WINDOWS = [
@@ -144,6 +156,7 @@ export function findPlan(id: string): Plan {
 /** Human-readable name for an order's plan key, e.g. "weekly_2" -> "2 pickups/week". */
 export function planLabel(plan: string): string {
   if (plan === INSTANT_PICKUP.id) return INSTANT_PICKUP.name
+  if (plan === "special") return "Special pickup"
   const match = PLANS.find((p) => p.id === plan) ?? BAG_SIZES.find((b) => b.id === plan)
   return match?.name ?? plan
 }

@@ -33,7 +33,7 @@ async function customer(phone = "08012345678") {
 
 async function admin() {
   const res = await request(app).post("/auth/register").send({ name: "Staff", phone: "08099990000", password: "password123" })
-  await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
+  await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN", staffRole: "OWNER" } })
   return { Authorization: `Bearer ${res.body.token}` }
 }
 

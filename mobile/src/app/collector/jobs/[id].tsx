@@ -32,6 +32,7 @@ export default function Job() {
   const [reason, setReason] = useState("")
   const [bags, setBags] = useState<number | null>(null)
   const [cash, setCash] = useState(false)
+  const [weight, setWeight] = useState("")
 
   const job = data?.job
   if (!job) return error ? <ErrorBanner message={error} onRetry={refresh} /> : <Loading />
@@ -174,6 +175,15 @@ export default function Job() {
               {!cash ? <Text style={font.muted}>The customer will be asked to pay in the app.</Text> : null}
             </View>
           ) : null}
+          {isPickup ? (
+            <TextField
+              label="Weight in kg (optional)"
+              keyboardType="decimal-pad"
+              value={weight}
+              onChangeText={setWeight}
+              hint="If you weighed the bags."
+            />
+          ) : null}
           <TextField label="Note (optional)" value={note} onChangeText={setNote} maxLength={500} placeholder="e.g. Left bags at the gate" />
           <Button
             title="Confirm"
@@ -187,6 +197,7 @@ export default function Job() {
                   photo,
                   ...(isPickup ? { bags: bagCount } : {}),
                   ...(extra > 0 && cash ? { extraPaidCash: true } : {}),
+                  ...(isPickup && Number(weight.replace(",", ".")) > 0 ? { weightKg: Number(weight.replace(",", ".")) } : {}),
                 },
               })
             }
@@ -227,6 +238,7 @@ export default function Job() {
           </Text>
           {job.completedAt ? <Row label="Closed" value={formatDate(job.completedAt)} /> : null}
           {job.bagsCollected !== null ? <Row label="Bags collected" value={String(job.bagsCollected)} /> : null}
+          {job.weightKg !== null ? <Row label="Weight" value={`${job.weightKg} kg`} /> : null}
           {job.extraAmount > 0 ? (
             <Row label="Extra bags" value={`${naira(job.extraAmount)} · ${job.extraPaid ? "paid" : "customer to pay in app"}`} />
           ) : null}

@@ -5,8 +5,10 @@ import type {
   AdminSubscription,
   AdminSummary,
   AdminArea,
+  AdminQuote,
   AdminRefund,
   AdminTicket,
+  AuditEntry,
   AreaCheck,
   Catalog,
   Collector,
@@ -16,6 +18,9 @@ import type {
   CustomerDetail,
   CustomerSummary,
   Dashboard,
+  Disposal,
+  DisposalKind,
+  DisposalList,
   Earnings,
   ExportKind,
   Order,
@@ -23,6 +28,8 @@ import type {
   Payment,
   PaymentRecord,
   PlanChangeQuote,
+  Quote,
+  QuoteStatus,
   Refund,
   RouteStop,
   SavedAddress,
@@ -30,11 +37,13 @@ import type {
   StockLevel,
   StockMovement,
   StockSize,
+  StaffMember,
   Subscription,
   SupportTicket,
   TicketStatus,
   TimeWindow,
   User,
+  WasteReport,
 } from "./types"
 
 // Set EXPO_PUBLIC_API_URL in mobile/.env. On a physical phone use your
@@ -121,7 +130,9 @@ async function appendImage(form: FormData, field: string, image: PickedImage) {
   }
 }
 
-export type CompleteJob = { note?: string; photo?: PickedImage | null; bags?: number; extraPaidCash?: boolean }
+export type CompleteJob = { note?: string; photo?: PickedImage | null; bags?: number; extraPaidCash?: boolean; weightKg?: number }
+
+export type DisposalInput = { site: string; kind: DisposalKind; wasteType: string; weightKg: number; ticketNo?: string; note?: string }
 
 export type AuthResponse = { token: string; user: User }
 
@@ -208,6 +219,20 @@ export const api = {
     post<{ payment: Payment; authorizationUrl: string }>("/payments", body),
   payment: (reference: string) => request<{ payment: Payment }>(`/payments/${encodeURIComponent(reference)}`),
 
+  requestQuote: async (input: { category: string; description: string; addressId: string; preferredDate: string; photo?: PickedImage | null }) => {
+    const form = new FormData()
+    form.append("category", input.category)
+    form.append("description", input.description)
+    form.append("addressId", input.addressId)
+    form.append("preferredDate", input.preferredDate)
+    if (input.photo) await appendImage(form, "photo", input.photo)
+    return request<{ quote: Quote }>("/quotes", { method: "POST", body: form })
+  },
+  quotes: () => request<{ quotes: Quote[] }>("/quotes"),
+  quote: (id: string) => request<{ quote: Quote }>(`/quotes/${id}`),
+  acceptQuote: (id: string) => post<{ order: Order }>(`/quotes/${id}/accept`),
+  declineQuote: (id: string) => post<{ quote: Quote }>(`/quotes/${id}/decline`),
+
   createTicket: (body: { category: string; message: string; contactTime: string; orderId?: string }) =>
     post<{ ticket: SupportTicket }>("/support-tickets", body),
   tickets: () => request<{ tickets: SupportTicket[] }>("/support-tickets"),
@@ -221,6 +246,20 @@ export const api = {
       post<{ refund: Refund; left: number }>(`/admin/orders/${id}/refund`, body),
     refunds: () => request<{ refunds: AdminRefund[] }>("/admin/refunds"),
     dashboard: () => request<Dashboard>("/admin/dashboard"),
+    quotes: (status?: QuoteStatus) => request<{ quotes: AdminQuote[] }>(`/admin/quotes${query({ status })}`),
+    quote: (id: string) => request<{ quote: AdminQuote }>(`/admin/quotes/${id}`),
+    sendQuote: (id: string, body: { amount: number; note?: string }) => post<{ quote: AdminQuote }>(`/admin/quotes/${id}/quote`, body),
+    closeQuote: (id: string, note: string) => post<{ quote: AdminQuote }>(`/admin/quotes/${id}/cancel`, { note }),
+    staff: () => request<{ staff: StaffMember[] }>("/admin/staff"),
+    addStaff: (body: { name: string; phone: string; password: string; staffRole: "OWNER" | "STAFF" }) =>
+      post<{ staff: StaffMember }>("/admin/staff", body),
+    updateStaff: (id: string, body: { staffRole?: "OWNER" | "STAFF"; disabled?: boolean }) =>
+      patch<{ staff: StaffMember }>(`/admin/staff/${id}`, body),
+    audit: (params: { q?: string; targetType?: string; targetId?: string } = {}) =>
+      request<{ entries: AuditEntry[] }>(`/admin/audit${query(params)}`),
+    disposals: () => request<DisposalList>("/admin/disposals"),
+    addDisposal: (body: DisposalInput) => post<{ disposal: Disposal }>("/admin/disposals", body),
+    wasteReport: (range: { from: string; to: string }) => request<WasteReport>(`/admin/reports/waste${query(range)}`),
     autoAssign: () => post<{ assigned: number }>("/admin/auto-assign"),
     customers: (params: { q?: string; suspended?: "true" | "false" } = {}) =>
       request<{ customers: CustomerSummary[] }>(`/admin/customers${query(params)}`),
@@ -271,6 +310,15 @@ export const api = {
         `/collector/route${from ? query({ lat: String(from.lat), lng: String(from.lng) }) : ""}`,
       ),
     earnings: () => request<Earnings>("/collector/earnings"),
+    disposals: () => request<DisposalList>("/collector/disposals"),
+    async addDisposal(input: DisposalInput & { photo?: PickedImage | null }) {
+      const form = new FormData()
+      for (const [key, value] of Object.entries(input)) {
+        if (key !== "photo" && value !== undefined && value !== null && value !== "") form.append(key, String(value))
+      }
+      if (input.photo) await appendImage(form, "photo", input.photo)
+      return request<{ disposal: Disposal }>("/collector/disposals", { method: "POST", body: form })
+    },
     jobs: () => request<CollectorJobs>("/collector/jobs"),
     job: (id: string) => request<{ job: CollectorJob }>(`/collector/jobs/${id}`),
     onTheWay: (id: string) => post<{ job: CollectorJob }>(`/collector/jobs/${id}/on-the-way`),
@@ -279,6 +327,7 @@ export const api = {
       if (input.note) form.append("note", input.note)
       if (input.bags !== undefined) form.append("bags", String(input.bags))
       if (input.extraPaidCash) form.append("extraPaidCash", "true")
+      if (input.weightKg !== undefined) form.append("weightKg", String(input.weightKg))
       if (input.photo) await appendImage(form, "proof", input.photo)
       return request<{ job: CollectorJob }>(`/collector/jobs/${id}/complete`, { method: "POST", body: form })
     },

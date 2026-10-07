@@ -160,7 +160,7 @@ describe("support and admin", () => {
     expect((await request(app).get("/admin/orders").set(auth)).status).toBe(403)
 
     const admin = { Authorization: `Bearer ${await register("08099990000", "Staff")}` }
-    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
+    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN", staffRole: "OWNER" } })
     const collector = await request(app)
       .post("/admin/collectors")
       .set(admin)
@@ -193,7 +193,7 @@ describe("admin order workflow", () => {
   async function setup() {
     const customer = { Authorization: `Bearer ${await register()}` }
     const admin = { Authorization: `Bearer ${await register("08099990000", "Staff")}` }
-    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN" } })
+    await prisma.user.update({ where: { phone: "+2348099990000" }, data: { role: "ADMIN", staffRole: "OWNER" } })
     const { body } = await request(app)
       .post("/orders")
       .set(customer)

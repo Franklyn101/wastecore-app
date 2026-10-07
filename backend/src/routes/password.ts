@@ -2,9 +2,10 @@ import bcrypt from "bcryptjs"
 import { Router } from "express"
 import rateLimit from "express-rate-limit"
 import { z } from "zod"
-import { currentUser, publicUser, requireAdmin, requireUser, signToken } from "../auth.ts"
+import { currentUser, publicUser, requireAdmin, requireOwner, requireUser, signToken } from "../auth.ts"
 import { issueCode, RESEND_AFTER_SECONDS, useCode } from "../codes.ts"
 import { config } from "../config.ts"
+import { audit } from "../audit.ts"
 import { prisma } from "../db.ts"
 import type { User } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
@@ -80,11 +81,12 @@ passwordRouter.post("/me/password", requireUser, async (req, res) => {
 })
 
 // Staff help someone who's locked out (e.g. no SMS signal) by giving them a temporary password.
-passwordRouter.post("/admin/users/password", requireUser, requireAdmin, async (req, res) => {
+passwordRouter.post("/admin/users/password", requireUser, requireAdmin, requireOwner, async (req, res) => {
   const body = z.object({ phone: phoneSchema, password: passwordSchema }).parse(req.body)
   const user = await prisma.user.findUnique({ where: { phone: body.phone } })
   if (!user) throw new HttpError(404, "No account uses that phone number.")
   if (user.role === "ADMIN") throw new HttpError(403, "Staff passwords can't be reset here.")
   await setPassword(user.id, body.password)
+  await audit(currentUser(req), "account.temporary_password", { type: user.role.toLowerCase(), id: user.id }, `Set a temporary password for ${user.name} (${user.phone})`)
   res.json({ user: { name: user.name, phone: user.phone, role: user.role } })
 })

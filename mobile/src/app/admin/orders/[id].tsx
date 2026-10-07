@@ -4,6 +4,7 @@ import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
 import { RefundSection } from "../../../components/RefundForm"
 import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api } from "../../../lib/api"
+import { useIsOwner } from "../../../lib/auth"
 import { confirmAction } from "../../../lib/dialogs"
 import { assignable, formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../../lib/format"
 import type { AdminOrder, Collector } from "../../../lib/types"
@@ -32,6 +33,7 @@ export default function ManageOrder() {
   const { data, error, refreshing, refresh, setData } = useFocusData(() => api.admin.order(id))
   const collectors = useFocusData(() => api.admin.collectors())
   const action = useSubmit()
+  const owner = useIsOwner()
 
   const [collectorId, setCollectorId] = useState<string | null>(null)
   const [changingCollector, setChangingCollector] = useState(false)
@@ -139,6 +141,7 @@ export default function ManageOrder() {
               <Row label={order.status === "INCOMPLETE" ? "Closed (not done)" : "Completed"} value={formatDateTime(order.completedAt)} />
             ) : null}
             {order.bagsCollected !== null ? <Row label="Bags collected" value={`${order.bagsCollected} (booked ${order.quantity})`} /> : null}
+            {order.weightKg !== null ? <Row label="Weight" value={`${order.weightKg} kg`} /> : null}
             {order.extraAmount > 0 ? (
               <Row
                 label="Extra bags"
@@ -203,7 +206,7 @@ export default function ManageOrder() {
         </Card>
       </Section>
 
-      <RefundSection order={order} refunds={data.refunds} onRefunded={refresh} />
+      {owner ? <RefundSection order={order} refunds={data.refunds} onRefunded={refresh} /> : null}
 
       <Section title="Notes for the collector">
         <TextField

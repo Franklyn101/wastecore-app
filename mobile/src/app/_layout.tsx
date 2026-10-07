@@ -46,6 +46,9 @@ function RootNavigator() {
         <Stack.Screen name="support/new" options={{ title: "Contact support" }} />
         <Stack.Screen name="addresses/index" options={{ title: "My addresses" }} />
         <Stack.Screen name="payments" options={{ title: "Payment history" }} />
+        <Stack.Screen name="quotes/index" options={{ title: "Special waste" }} />
+        <Stack.Screen name="quotes/new" options={{ title: "Ask for a quote" }} />
+        <Stack.Screen name="quotes/[id]" options={{ title: "Quote" }} />
         <Stack.Screen name="addresses/edit" options={{ title: "Address" }} />
       </Stack.Protected>
       <Stack.Protected guard={isAdmin}>
@@ -59,12 +62,18 @@ function RootNavigator() {
         <Stack.Screen name="admin/stock" options={{ title: "Bag stock" }} />
         <Stack.Screen name="admin/refunds" options={{ title: "Refunds" }} />
         <Stack.Screen name="admin/exports" options={{ title: "Reports" }} />
+        <Stack.Screen name="admin/quotes/index" options={{ title: "Special waste quotes" }} />
+        <Stack.Screen name="admin/quotes/[id]" options={{ title: "Quote" }} />
+        <Stack.Screen name="admin/staff" options={{ title: "Staff and access" }} />
+        <Stack.Screen name="admin/activity" options={{ title: "Activity log" }} />
+        <Stack.Screen name="admin/waste" options={{ title: "Waste report" }} />
       </Stack.Protected>
       <Stack.Protected guard={isCollector}>
         <Stack.Screen name="collector/(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="collector/jobs/[id]" options={{ title: "Job" }} />
         <Stack.Screen name="collector/route" options={{ title: "Today's route" }} />
         <Stack.Screen name="collector/earnings" options={{ title: "Earnings" }} />
+        <Stack.Screen name="collector/disposal" options={{ title: "Drop-offs" }} />
       </Stack.Protected>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="notifications" options={{ title: "Notifications" }} />

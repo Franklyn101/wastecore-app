@@ -1,6 +1,6 @@
 // What each event tells whom. All notification wording lives here.
 import { planLabel } from "./catalog.ts"
-import type { Order, ServiceArea, Subscription } from "./generated/prisma/client.ts"
+import type { Order, QuoteRequest, ServiceArea, Subscription } from "./generated/prisma/client.ts"
 import { findPlan } from "./catalog.ts"
 import { prisma } from "./db.ts"
 import { notify, notifyCollector, notifyStaff } from "./notify.ts"
@@ -14,6 +14,7 @@ const day = (date: Date) =>
 function what(order: Order) {
   if (order.type === "INSTANT_PICKUP") return `Pickup (${order.quantity} bag${order.quantity === 1 ? "" : "s"})`
   if (order.type === "WASTE_BAGS") return `${planLabel(order.plan)} bags × ${order.quantity}`
+  if (order.type === "SPECIAL_PICKUP") return `Special pickup (${order.wasteType})`
   return "Plan pickup"
 }
 
@@ -225,6 +226,35 @@ export const events = {
 
   async collectorApplied(name: string, area: string) {
     await notifyStaff({ title: "New collector application", body: `${name} (${area}) applied in the app.`, url: "/admin/collectors" })
+  },
+
+  // ── Special waste quotes ────────────────────────────────
+  async quoteRequested(quote: QuoteRequest, customerName: string) {
+    await notifyStaff({ title: "Quote request", body: `${quote.reference} · ${quote.category} · ${customerName}`, url: `/admin/quotes/${quote.id}` })
+  },
+
+  async quoteSent(quote: QuoteRequest) {
+    await notify(quote.userId, {
+      title: "Your quote is ready",
+      body: `${quote.reference}: ${naira(quote.amount!)} for your ${quote.category.toLowerCase()} pickup. Tap to accept.`,
+      url: `/quotes/${quote.id}`,
+    })
+  },
+
+  async quoteCancelled(quote: QuoteRequest) {
+    await notify(quote.userId, {
+      title: "About your quote request",
+      body: `${quote.reference}: ${quote.staffNote ?? "We can't take this one on. Please contact support."}`,
+      url: `/quotes/${quote.id}`,
+    })
+  },
+
+  async quoteAnswered(quote: QuoteRequest, accepted: boolean) {
+    await notifyStaff({
+      title: accepted ? "Quote accepted" : "Quote declined",
+      body: `${quote.reference} · ${quote.category} · ${naira(quote.amount ?? 0)}`,
+      url: `/admin/quotes/${quote.id}`,
+    })
   },
 
   // ── Stock, refunds and accounts ─────────────────────────

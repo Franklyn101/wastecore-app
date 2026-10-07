@@ -16,7 +16,7 @@ afterAll(() => prisma.$disconnect())
 async function register(phone: string, role?: "ADMIN"): Promise<Auth & { id: string }> {
   const res = await request(app).post("/auth/register").send({ name: "Tari", phone, password: "password123" })
   await verifyPhone(res.body.user.id)
-  if (role) await prisma.user.update({ where: { id: res.body.user.id }, data: { role } })
+  if (role) await prisma.user.update({ where: { id: res.body.user.id }, data: { role, staffRole: "OWNER" } })
   return { Authorization: `Bearer ${res.body.token}`, id: res.body.user.id }
 }
 const auth = (a: Auth & { id: string }) => ({ Authorization: a.Authorization })

@@ -10,10 +10,17 @@ if (process.env.NODE_ENV === "production" && process.env.ALLOW_DEMO_SEED !== "tr
 const now = new Date()
 const hash = (p: string) => bcrypt.hash(p, 10)
 
-async function user(phone: string, name: string, password: string, role: "ADMIN" | "CUSTOMER" | "COLLECTOR", address?: string) {
+async function user(
+  phone: string,
+  name: string,
+  password: string,
+  role: "ADMIN" | "CUSTOMER" | "COLLECTOR",
+  address?: string,
+  staffRole?: "OWNER" | "STAFF",
+) {
   return prisma.user.upsert({
     where: { phone },
-    create: { phone, name, role, address, passwordHash: await hash(password), phoneVerifiedAt: now },
+    create: { phone, name, role, staffRole, address, passwordHash: await hash(password), phoneVerifiedAt: now },
     update: {},
   })
 }
@@ -21,7 +28,8 @@ async function user(phone: string, name: string, password: string, role: "ADMIN"
 // Yenagoa, Bayelsa is the launch area (seeded by the service_areas migration).
 const yenagoa = await prisma.serviceArea.findUniqueOrThrow({ where: { slug: "yenagoa" } })
 
-await user("+2348090000001", "Grace (Ops)", "staff-password-123", "ADMIN")
+await user("+2348090000001", "Grace (Main admin)", "staff-password-123", "ADMIN", undefined, "OWNER")
+await user("+2348090000002", "Tunde (Staff)", "staff-password-123", "ADMIN", undefined, "STAFF")
 const ada = await user("+2348035551234", "Ada Obi", "customer-pass-1", "CUSTOMER", "14 Azikoro Road, Ekeki, Yenagoa")
 if ((await prisma.address.count({ where: { userId: ada.id } })) === 0) {
   await prisma.address.create({
@@ -51,7 +59,8 @@ for (const c of [
 }
 
 console.log(`Demo accounts ready (password in brackets):
-  Staff      08090000001 (staff-password-123)
+  Main admin 08090000001 (staff-password-123)
+  Staff      08090000002 (staff-password-123)
   Customer   08035551234 (customer-pass-1)
   Collector  07011112222 (collector-pass-1)`)
 await prisma.$disconnect()

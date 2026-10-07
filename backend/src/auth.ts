@@ -102,5 +102,16 @@ export function publicUser(user: User) {
     email: user.email,
     address: user.address,
     role: user.role,
+    staffRole: user.role === "ADMIN" ? (user.staffRole ?? "STAFF") : null,
   }
 }
+
+/** Money, accounts and settings: the main admin only. */
+export function requireOwner(req: Request, _res: Response, next: NextFunction) {
+  if (req.user?.role !== "ADMIN" || req.user.staffRole !== "OWNER") {
+    throw new HttpError(403, "Only the main admin can do this.")
+  }
+  next()
+}
+
+export const isOwner = (user: User) => user.role === "ADMIN" && user.staffRole === "OWNER"

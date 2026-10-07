@@ -67,6 +67,7 @@ export default function CollectorJobs() {
         <Button title="Today's route" style={{ flex: 1 }} onPress={() => router.push("/collector/route")} />
         <Button title="Earnings" variant="secondary" style={{ flex: 1 }} onPress={() => router.push("/collector/earnings")} />
       </View>
+      <Button title="Log a drop-off at the dump site" variant="secondary" onPress={() => router.push("/collector/disposal")} />
 
       <View style={{ flexDirection: "row", gap: spacing.md }}>
         <Stat label="Done today" value={data.stats.doneToday} />

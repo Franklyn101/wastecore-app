@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Pressable, Text, View } from "react-native"
 import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, Section } from "../../../components/ui"
 import { api } from "../../../lib/api"
+import { useIsOwner } from "../../../lib/auth"
 import { naira } from "../../../lib/format"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
@@ -11,6 +12,7 @@ import { colors, font, radius, spacing } from "../../../theme"
 // The day at a glance, and the way into customers, stock, refunds and reports.
 export default function Overview() {
   const { data, error, refreshing, refresh } = useFocusData(() => api.admin.dashboard())
+  const owner = useIsOwner()
   const assign = useSubmit()
   const [assigned, setAssigned] = useState<string | null>(null)
 
@@ -27,6 +29,12 @@ export default function Overview() {
           <Tile label="Need a collector" value={data.today.unassigned} tone={data.today.unassigned ? "warning" : undefined} />
           <Tile label="Receipts to check" value={data.today.waitingPayment} tone={data.today.waitingPayment ? "warning" : undefined} />
           <Tile label="Collectors on duty" value={data.collectorsOnDuty} />
+          <Tile
+            label="Quotes to price"
+            value={data.quotesWaiting}
+            tone={data.quotesWaiting ? "warning" : undefined}
+            onPress={() => router.push("/admin/quotes")}
+          />
         </View>
         {data.today.unassigned && anyAutoAssign ? (
           <>
@@ -57,13 +65,15 @@ export default function Overview() {
         ))}
       </Section>
 
-      <Section title="Money in (after refunds)">
-        <Card>
-          <Row label="Today" value={naira(data.revenue.today)} />
-          <Row label="Last 7 days" value={naira(data.revenue.last7Days)} />
-          <Row label="Last 30 days" value={naira(data.revenue.last30Days)} />
-        </Card>
-      </Section>
+      {data.revenue ? (
+        <Section title="Money in (after refunds)">
+          <Card>
+            <Row label="Today" value={naira(data.revenue.today)} />
+            <Row label="Last 7 days" value={naira(data.revenue.last7Days)} />
+            <Row label="Last 30 days" value={naira(data.revenue.last30Days)} />
+          </Card>
+        </Section>
+      ) : null}
 
       <Section title="Customers">
         <Card>
@@ -89,11 +99,19 @@ export default function Overview() {
       ) : null}
 
       <Section title="Manage">
+        <Button title="Special waste quotes" variant="secondary" onPress={() => router.push("/admin/quotes")} />
         <Button title="Customers" variant="secondary" onPress={() => router.push("/admin/customers")} />
         <Button title="Bag stock" variant="secondary" onPress={() => router.push("/admin/stock")} />
-        <Button title="Refunds" variant="secondary" onPress={() => router.push("/admin/refunds")} />
-        <Button title="Reports (CSV)" variant="secondary" onPress={() => router.push("/admin/exports")} />
+        <Button title="Waste report" variant="secondary" onPress={() => router.push("/admin/waste")} />
         <Button title="Service areas" variant="secondary" onPress={() => router.push("/admin/areas")} />
+        {owner ? (
+          <>
+            <Button title="Refunds" variant="secondary" onPress={() => router.push("/admin/refunds")} />
+            <Button title="Reports (CSV)" variant="secondary" onPress={() => router.push("/admin/exports")} />
+            <Button title="Staff and access" variant="secondary" onPress={() => router.push("/admin/staff")} />
+            <Button title="Activity log" variant="secondary" onPress={() => router.push("/admin/activity")} />
+          </>
+        ) : null}
       </Section>
     </Screen>
   )

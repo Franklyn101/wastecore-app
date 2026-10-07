@@ -153,12 +153,14 @@ const completeSchema = z.object({
   bags: z.coerce.number().int().min(0).max(200).optional(),
   // The customer paid for extra bags in cash there and then.
   extraPaidCash: z.preprocess((v) => v === true || v === "true", z.boolean()).optional(),
+  // Weighed on the truck's scale, if there is one.
+  weightKg: z.coerce.number().min(0).max(20000).optional(),
 })
 
 // Done. Optionally with a photo (multipart field "proof"), a note, and the bags collected.
 collectorRouter.post("/collector/jobs/:id/complete", imageUpload.single("proof"), async (req, res) => {
   const collector = currentCollector(req)
-  const { note, bags, extraPaidCash } = completeSchema.parse(req.body ?? {})
+  const { note, bags, extraPaidCash, weightKg } = completeSchema.parse(req.body ?? {})
   const job = await openJob(req.params.id, collector)
   const bagsCollected = job.type === "WASTE_BAGS" ? null : (bags ?? job.quantity)
   const extraAmount = extraBagsCharge(job, bagsCollected)
@@ -173,6 +175,7 @@ collectorRouter.post("/collector/jobs/:id/complete", imageUpload.single("proof")
     collectorNote: note || null,
     proofPhotoUrl,
     bagsCollected,
+    weightKg: job.type === "WASTE_BAGS" ? null : (weightKg ?? null),
     extraAmount,
     ...(extraAmount && extraPaidCash ? { extraPaidAt: new Date(), extraPaymentMethod: "CASH" as const } : {}),
     collectorPay: payFor(job, bagsCollected),

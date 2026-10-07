@@ -1,4 +1,4 @@
-// Creates (or promotes) an admin account from ADMIN_NAME, ADMIN_PHONE and ADMIN_PASSWORD.
+// Creates (or promotes) a main admin account from ADMIN_NAME, ADMIN_PHONE and ADMIN_PASSWORD.
 // Usage: npm run db:create-admin
 import bcrypt from "bcryptjs"
 import { prisma } from "../src/db.ts"
@@ -14,8 +14,9 @@ if (password.length < 12) throw new Error("Set ADMIN_PASSWORD to at least 12 cha
 const passwordHash = await bcrypt.hash(password, 12)
 const admin = await prisma.user.upsert({
   where: { phone },
-  create: { name, phone, passwordHash, role: "ADMIN", phoneVerifiedAt: new Date() },
-  update: { role: "ADMIN", passwordHash, phoneVerifiedAt: new Date() },
+  // The first admin is the main admin (owner), who can add other staff in the app.
+  create: { name, phone, passwordHash, role: "ADMIN", staffRole: "OWNER", phoneVerifiedAt: new Date() },
+  update: { role: "ADMIN", staffRole: "OWNER", passwordHash, phoneVerifiedAt: new Date() },
 })
 console.log(`Admin ready: ${admin.name} (${admin.phone})`)
 await prisma.$disconnect()

@@ -14,6 +14,7 @@ const KINDS: { id: ExportKind; title: string; subtitle: string }[] = [
   { id: "refunds", title: "Refunds", subtitle: "Refunds given, with reasons" },
   { id: "payouts", title: "Collector payouts", subtitle: "What collectors were paid" },
   { id: "customers", title: "New customers", subtitle: "Accounts created in the period" },
+  { id: "disposals", title: "Waste drop-offs", subtitle: "Loads taken to dump sites and recyclers, with weights" },
 ]
 
 const RANGES = [7, 30, 90, 365]

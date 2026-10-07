@@ -17,7 +17,7 @@ export function canChange(order: Order): boolean {
   const open =
     order.status === "PENDING" ||
     order.status === "ASSIGNED" ||
-    (order.status === "AWAITING_PAYMENT" && order.type === "INSTANT_PICKUP")
+    (order.status === "AWAITING_PAYMENT" && (order.type === "INSTANT_PICKUP" || order.type === "SPECIAL_PICKUP"))
   return open && daysUntil(order.scheduledDate) >= 0
 }
 

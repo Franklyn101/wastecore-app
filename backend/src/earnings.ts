@@ -6,6 +6,7 @@ import type { Order } from "./generated/prisma/client.ts"
 /** What a collector earns for a completed job. */
 export function payFor(order: Pick<Order, "type" | "quantity">, bagsCollected: number | null): number {
   if (order.type === "WASTE_BAGS") return COLLECTOR_PAY.bagDelivery
+  if (order.type === "SPECIAL_PICKUP") return COLLECTOR_PAY.specialPickup
   return COLLECTOR_PAY.pickup + COLLECTOR_PAY.perBag * (bagsCollected ?? order.quantity)
 }
 

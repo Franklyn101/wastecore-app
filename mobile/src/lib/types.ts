@@ -8,11 +8,13 @@ export type User = {
   email: string | null
   address: string | null
   role: "CUSTOMER" | "ADMIN" | "COLLECTOR"
+  /** Admins only: the main admin (OWNER) can also handle money, accounts and settings. */
+  staffRole: "OWNER" | "STAFF" | null
 }
 
 export type TimeWindow = "MORNING" | "AFTERNOON"
 
-export type OrderType = "INSTANT_PICKUP" | "PLAN_PICKUP" | "WASTE_BAGS"
+export type OrderType = "INSTANT_PICKUP" | "PLAN_PICKUP" | "WASTE_BAGS" | "SPECIAL_PICKUP"
 
 export type OrderStatus = "AWAITING_PAYMENT" | "PENDING" | "ASSIGNED" | "COMPLETED" | "INCOMPLETE" | "CANCELLED"
 
@@ -37,6 +39,7 @@ export type Order = {
   quantity: number
   /** Bags the collector actually took; extra bags on an instant pickup are owed as `extraAmount`. */
   bagsCollected: number | null
+  weightKg: number | null
   extraAmount: number
   extraPaidAt: string | null
   extraPaymentMethod: "PAYSTACK" | "TRANSFER" | "CASH" | null
@@ -133,6 +136,7 @@ export type Catalog = {
   maxBagPacks: number
   wasteTypes: string[]
   timeWindows: { id: TimeWindow; label: string; hours: string }[]
+  specialWasteCategories: string[]
   supportCategories: string[]
   bank: { bankName: string; accountName: string; accountNumber: string }
   onlinePayments: boolean
@@ -189,6 +193,7 @@ export type CollectorJob = {
   rating: number | null
   ratingComment: string | null
   bagsCollected: number | null
+  weightKg: number | null
   extraAmount: number
   extraPaid: boolean
   /** What the collector earns for it, once completed. */
@@ -294,7 +299,8 @@ export type AdminRefund = Refund & {
 
 export type Dashboard = {
   today: { due: number; done: number; notDone: number; unassigned: number; waitingPayment: number }
-  revenue: { today: number; last7Days: number; last30Days: number }
+  /** Main admin only; null for staff. */
+  revenue: { today: number; last7Days: number; last30Days: number } | null
   activePlans: number
   newCustomers7Days: number
   collectorsOnDuty: number
@@ -302,6 +308,7 @@ export type Dashboard = {
   rating: { average: number | null; count: number }
   areas: { id: string; name: string; today: number; capacity: number | null; autoAssign: boolean }[]
   stock: StockLevel[]
+  quotesWaiting: number
 }
 
 export type StockLevel = { size: string; name: string; packs: number; onOrder: number; available: number; lowAt: number }
@@ -339,4 +346,66 @@ export type CustomerDetail = {
   addresses: { id: string; label: string; address: string; landmark: string | null }[]
 }
 
-export type ExportKind = "orders" | "payments" | "customers" | "payouts" | "refunds"
+export type ExportKind = "orders" | "payments" | "customers" | "payouts" | "refunds" | "disposals"
+
+export type QuoteStatus = "NEW" | "QUOTED" | "ACCEPTED" | "DECLINED" | "CANCELLED"
+
+export type Quote = {
+  id: string
+  reference: string
+  category: string
+  description: string
+  photoUrl: string | null
+  address: string
+  landmark: string | null
+  lat: number
+  lng: number
+  preferredDate: string
+  status: QuoteStatus
+  amount: number | null
+  staffNote: string | null
+  quotedAt: string | null
+  orderId: string | null
+  createdAt: string
+}
+
+export type AdminQuote = Quote & { customer: Customer }
+
+export type StaffMember = { id: string; name: string; phone: string; staffRole: "OWNER" | "STAFF"; disabled: boolean; createdAt: string }
+
+export type AuditEntry = { id: string; actorName: string; action: string; targetType: string; targetId: string | null; summary: string; createdAt: string }
+
+export type DisposalKind = "LANDFILL" | "RECYCLER" | "COMPOST" | "OTHER"
+
+export type Disposal = {
+  id: string
+  site: string
+  kind: DisposalKind
+  wasteType: string
+  weightKg: number
+  ticketNo: string | null
+  photoUrl: string | null
+  note: string | null
+  disposedAt: string
+  collector: string | null
+}
+
+export type DisposalList = { disposals: Disposal[]; recentSites: { site: string; kind: DisposalKind }[] }
+
+export type WasteReport = {
+  collected: {
+    pickups: number
+    bags: number
+    weighedPickups: number
+    kg: number
+    byWasteType: { name: string; pickups: number; bags: number; kg: number }[]
+    byArea: { name: string; pickups: number; bags: number; kg: number }[]
+  }
+  disposed: {
+    loads: number
+    kg: number
+    divertedPercent: number | null
+    byKind: { kind: DisposalKind; loads: number; kg: number }[]
+    bySite: { site: string; kind: DisposalKind; loads: number; kg: number }[]
+  }
+}

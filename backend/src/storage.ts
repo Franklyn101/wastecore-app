@@ -54,7 +54,7 @@ export function looksLikeImage(buf: Buffer): boolean {
 export async function saveImage(
   file: { buffer: Buffer; mimetype: string },
   orderReference: string,
-  kind: "receipts" | "proof",
+  kind: "receipts" | "proof" | "quotes" | "disposals",
 ) {
   const name = `${orderReference}_${randomUUID()}`
 

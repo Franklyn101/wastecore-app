@@ -146,7 +146,7 @@ describe("changing a password", () => {
   it("lets staff set a temporary password for customers, but not for staff", async () => {
     await register()
     const staffRes = await request(app).post("/auth/register").send({ name: "Staff", phone: "08099990000", password: "staff-pass-1" })
-    await prisma.user.update({ where: { id: staffRes.body.user.id }, data: { role: "ADMIN" } })
+    await prisma.user.update({ where: { id: staffRes.body.user.id }, data: { role: "ADMIN", staffRole: "OWNER" } })
     const staff = { Authorization: `Bearer ${staffRes.body.token}` }
 
     const res = await request(app).post("/admin/users/password").set(staff).send({ phone: "08012345678", password: "temporary-1" })
@@ -154,7 +154,7 @@ describe("changing a password", () => {
     expect((await login("temporary-1")).status).toBe(200)
 
     await request(app).post("/auth/register").send({ name: "Other staff", phone: "08088880000", password: "other-pass-1" })
-    await prisma.user.update({ where: { phone: "+2348088880000" }, data: { role: "ADMIN" } })
+    await prisma.user.update({ where: { phone: "+2348088880000" }, data: { role: "ADMIN", staffRole: "OWNER" } })
     expect((await request(app).post("/admin/users/password").set(staff).send({ phone: "08088880000", password: "hijack-123" })).status).toBe(403)
 
     const customer = { Authorization: `Bearer ${(await login("temporary-1")).body.token}` }
@@ -213,7 +213,7 @@ describe("phone verification", () => {
 
   it("doesn't need verifying for logins staff create", async () => {
     const staffRes = await request(app).post("/auth/register").send({ name: "Staff", phone: "08099990000", password: "staff-pass-1" })
-    await prisma.user.update({ where: { id: staffRes.body.user.id }, data: { role: "ADMIN" } })
+    await prisma.user.update({ where: { id: staffRes.body.user.id }, data: { role: "ADMIN", staffRole: "OWNER" } })
     const staff = { Authorization: `Bearer ${staffRes.body.token}` }
     const c = await request(app).post("/admin/collectors").set(staff).send({ name: "Musa", phone: "07011112222", area: "Ikeja" })
     await request(app).put(`/admin/collectors/${c.body.collector.id}/login`).set(staff).send({ password: "musa-pass-123" })

@@ -9,6 +9,7 @@ export const JOB_KIND: Record<CollectorJob["type"], string> = {
   INSTANT_PICKUP: "Pickup",
   PLAN_PICKUP: "Plan pickup",
   WASTE_BAGS: "Bag delivery",
+  SPECIAL_PICKUP: "Special pickup",
 }
 
 /** "3 bags · Plastic", "Medium bags × 2 packs", "Mixed". */
