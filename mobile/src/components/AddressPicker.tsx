@@ -15,7 +15,8 @@ export function AddressPicker({
 }: {
   label: string
   value: string | null
-  onChange: (id: string | null) => void
+  /** Also passes the address, e.g. to look up its area. */
+  onChange: (id: string | null, address?: SavedAddress) => void
 }) {
   const { data, error, refresh } = useFocusData(() => api.addresses().then((r) => r.addresses))
   const addresses = data ?? []
@@ -26,8 +27,8 @@ export function AddressPicker({
     if (!data) return
     const added = known.current ? data.find((a) => !known.current!.has(a.id)) : undefined
     known.current = new Set(data.map((a) => a.id))
-    if (added) onChange(added.id)
-    else if (!value || !data.some((a) => a.id === value)) onChange(data[0]?.id ?? null)
+    if (added) onChange(added.id, added)
+    else if (!value || !data.some((a) => a.id === value)) onChange(data[0]?.id ?? null, data[0])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
 
@@ -41,7 +42,7 @@ export function AddressPicker({
           title={a.label}
           subtitle={addressLine(a)}
           selected={value === a.id}
-          onPress={() => onChange(a.id)}
+          onPress={() => onChange(a.id, a)}
         />
       ))}
       {data && addresses.length === 0 ? (

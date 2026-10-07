@@ -87,6 +87,9 @@ model User {
   passwordChangedAt DateTime?
   role              Role      @default(CUSTOMER)
   address           String?
+  // Staff can suspend an account (e.g. abuse or unpaid balances); it can't sign in until restored.
+  suspendedAt       DateTime?
+  suspendedReason   String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -94,6 +97,7 @@ model User {
   tickets       SupportTicket[]
   subscriptions Subscription[]
   payments      Payment[]
+  refunds       Refund[]
   collector     Collector? // set when this login belongs to a collector
   pushTokens    PushToken[]
   notifications Notification[]
@@ -104,17 +108,21 @@ model User {
 
 // A city WasteCore serves (or will). Bookings must fall inside an active area.
 model ServiceArea {
-  id          String   @id @default(cuid())
-  slug        String   @unique // e.g. yenagoa
-  name        String // e.g. Yenagoa
-  state       String // e.g. Bayelsa
-  centerLat   Float
-  centerLng   Float
-  radiusKm    Float // bookings within this distance of the centre are in the area
-  active      Boolean  @default(false) // taking bookings
-  launchOrder Int // order the areas open in (and are listed in)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  slug          String   @unique // e.g. yenagoa
+  name          String // e.g. Yenagoa
+  state         String // e.g. Bayelsa
+  centerLat     Float
+  centerLng     Float
+  radiusKm      Float // bookings within this distance of the centre are in the area
+  active        Boolean  @default(false) // taking bookings
+  launchOrder   Int // order the areas open in (and are listed in)
+  // Paid orders here go straight to the on-duty collector with the fewest jobs that day.
+  autoAssign    Boolean  @default(false)
+  // Most pickups (one-off and plan) per day. Null means no limit.
+  dailyCapacity Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   addresses     Address[]
   orders        Order[]
@@ -304,6 +312,7 @@ model Order {
   payout       CollectorPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
   payments     Payment[]
   tickets      SupportTicket[]
+  refunds      Refund[]
 
   @@index([userId, createdAt])
   @@index([status, scheduledDate])
@@ -375,6 +384,59 @@ model Payment {
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+}
+
+enum RefundMethod {
+  PAYSTACK // sent back through Paystack to the customer's card or account
+  MANUAL // staff sent it themselves (e.g. a bank transfer) and recorded it here
+}
+
+enum RefundStatus {
+  PENDING // Paystack is processing it
+  PROCESSED
+  FAILED
+}
+
+// Money given back to a customer for an order.
+model Refund {
+  id          String       @id @default(cuid())
+  orderId     String
+  userId      String
+  amount      Int // naira
+  reason      String
+  method      RefundMethod
+  status      RefundStatus @default(PENDING)
+  paystackId  String? // Paystack's refund id
+  createdById String? // the staff member who issued it
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([orderId])
+}
+
+// Packs of waste bags in the store, per size. A size without a row isn't tracked.
+model BagStock {
+  size      String   @id // catalog bag size id: small, medium, large
+  packs     Int
+  lowAt     Int      @default(20) // staff are warned when stock falls to this
+  updatedAt DateTime @updatedAt
+}
+
+// Every change to bag stock: deliveries out, restocks in, and corrections.
+model StockMovement {
+  id          String   @id @default(cuid())
+  size        String
+  change      Int // negative when packs leave the store
+  reason      String
+  orderId     String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([size, createdAt])
 }
 
 model SupportTicket {

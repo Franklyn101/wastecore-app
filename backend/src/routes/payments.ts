@@ -54,10 +54,20 @@ paystackWebhook.post("/payments/paystack/webhook", express.raw({ type: "*/*", li
     res.sendStatus(401)
     return
   }
-  const event = JSON.parse(raw.toString("utf8")) as { event?: string; data?: PaystackTransaction }
+  const event = JSON.parse(raw.toString("utf8")) as {
+    event?: string
+    data?: PaystackTransaction & { id?: number | string; transaction_reference?: string }
+  }
   if (event.event === "charge.success" && event.data?.reference) {
     const payment = await prisma.payment.findUnique({ where: { reference: event.data.reference } })
     if (payment) await recordPaystackResult(payment, event.data)
+  }
+  // A refund staff issued has gone through (or failed) at Paystack.
+  if ((event.event === "refund.processed" || event.event === "refund.failed") && event.data?.id !== undefined) {
+    await prisma.refund.updateMany({
+      where: { paystackId: String(event.data.id), status: "PENDING" },
+      data: { status: event.event === "refund.processed" ? "PROCESSED" : "FAILED" },
+    })
   }
   res.sendStatus(200)
 })
@@ -107,7 +117,7 @@ paymentsRouter.post("/payments", requireUser, requireCustomer, async (req, res) 
 // Everything the customer has paid: card/online payments, and bank transfers staff confirmed.
 paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) => {
   const userId = currentUser(req).id
-  const [online, transfers, cash] = await Promise.all([
+  const [online, transfers, cash, refunds] = await Promise.all([
     prisma.payment.findMany({
       where: { userId, status: "SUCCESS" },
       include: { order: true, subscription: true },
@@ -121,6 +131,7 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
     }),
     // Extra bags paid to the collector in cash.
     prisma.order.findMany({ where: { userId, extraPaymentMethod: "CASH" }, orderBy: { extraPaidAt: "desc" }, take: 200 }),
+    prisma.refund.findMany({ where: { userId, status: { not: "FAILED" } }, include: { order: true }, orderBy: { createdAt: "desc" } }),
   ])
   const PURPOSE = { SUBSCRIPTION_START: "Plan started", SUBSCRIPTION_RENEWAL: "Plan renewed" }
   const describe = (p: (typeof online)[number]) => {
@@ -157,6 +168,17 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
       method: "Cash to collector",
       paidAt: o.extraPaidAt!,
       orderId: o.id,
+      subscriptionId: null,
+    })),
+    // Refunds show as negative amounts.
+    ...refunds.map((r) => ({
+      id: r.id,
+      reference: r.order.reference,
+      description: `Refund: ${r.reason}`,
+      amount: -r.amount,
+      method: r.method === "PAYSTACK" ? (r.status === "PENDING" ? "Paystack (on its way)" : "Paystack") : "Bank transfer",
+      paidAt: r.createdAt,
+      orderId: r.orderId,
       subscriptionId: null,
     })),
   ].sort((a, b) => b.paidAt.getTime() - a.paidAt.getTime())

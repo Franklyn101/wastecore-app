@@ -3,6 +3,8 @@ import { z } from "zod"
 import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { BAG_SIZES, bagSizeIds, INSTANT_PICKUP, MAX_BAG_PACKS } from "../catalog.ts"
 import { prisma } from "../db.ts"
+import { assertRoom, firstDayWithRoom } from "../capacity.ts"
+import { assertInStock } from "../stock.ts"
 import { locationFields, resolveLocation } from "./areas.ts"
 import type { Order, OrderType } from "../generated/prisma/client.ts"
 import { TimeWindow } from "../generated/prisma/enums.ts"
@@ -98,6 +100,13 @@ ordersRouter.post("/orders", async (req, res) => {
   const body = createOrderSchema.parse(req.body)
   const location = await resolveLocation(body, user.id)
   const data = orderData(body)
+  if (body.type === "INSTANT_PICKUP") {
+    // "As soon as possible" takes the first day with room; a chosen day must have room.
+    if (body.asap) data.scheduledDate = await firstDayWithRoom(location.areaId, data.scheduledDate)
+    else await assertRoom(location.areaId, data.scheduledDate)
+  } else {
+    await assertInStock(body.bagSize, body.quantity)
+  }
   const order = await withUniqueReference("WC", (reference) =>
     prisma.order.create({
       data: { ...data, ...location, scheduledDate: toDay(data.scheduledDate), reference, userId: user.id },
@@ -119,7 +128,12 @@ ordersRouter.get("/orders", async (req, res) => {
 })
 
 ordersRouter.get("/orders/:id", async (req, res) => {
-  res.json({ order: customerOrder(await findOwnOrder(req.params.id, currentUser(req).id)) })
+  const order = await findOwnOrder(req.params.id, currentUser(req).id)
+  const refunds = await prisma.refund.findMany({ where: { orderId: order.id, status: { not: "FAILED" } }, orderBy: { createdAt: "asc" } })
+  res.json({
+    order: customerOrder(order),
+    refunds: refunds.map((r) => ({ amount: r.amount, reason: r.reason, method: r.method, status: r.status, createdAt: r.createdAt })),
+  })
 })
 
 // Upload (or replace) the bank-transfer receipt. Moves the order to PENDING for an admin to verify.
@@ -182,6 +196,7 @@ ordersRouter.post("/orders/:id/reschedule", async (req, res) => {
   } else if (body.date > ymd(addDays(toDay(todayInLagos()), RESCHEDULE_MAX_DAYS))) {
     throw new HttpError(422, `Choose a date within the next ${RESCHEDULE_MAX_DAYS} days.`)
   }
+  if (body.date !== ymd(order.scheduledDate)) await assertRoom(order.areaId, body.date, order.id)
   const updated = await prisma.order.updateMany({
     where: { id: order.id, status: order.status, onTheWayAt: null },
     data: { scheduledDate: toDay(body.date), timeWindow: body.timeWindow ?? null, asap: false },

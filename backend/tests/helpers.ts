@@ -11,8 +11,10 @@ export const ABUJA = { lat: 9.0765, lng: 7.3986 }
 export async function resetDatabase() {
   await prisma.user.deleteMany()
   await prisma.collector.deleteMany()
+  await prisma.bagStock.deleteMany()
+  await prisma.stockMovement.deleteMany()
   // Service areas are seeded by the migration; put them back to launch state.
-  await prisma.serviceArea.updateMany({ data: { active: false } })
+  await prisma.serviceArea.updateMany({ data: { active: false, autoAssign: false, dailyCapacity: null } })
   await prisma.serviceArea.update({ where: { slug: "yenagoa" }, data: { active: true, radiusKm: 15, centerLat: YENAGOA.lat, centerLng: YENAGOA.lng } })
   await prisma.serviceArea.update({ where: { slug: "port-harcourt" }, data: { radiusKm: 20 } })
 }

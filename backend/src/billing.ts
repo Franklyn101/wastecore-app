@@ -6,6 +6,7 @@ import { prisma } from "./db.ts"
 import type { Payment, Prisma, Subscription } from "./generated/prisma/client.ts"
 import { HttpError } from "./http.ts"
 import { cardLabel, chargeAuthorization, type PaystackTransaction } from "./paystack.ts"
+import { autoAssign } from "./assign.ts"
 import { events } from "./events.ts"
 import { newReference } from "./references.ts"
 
@@ -165,7 +166,9 @@ export async function recordPaystackResult(payment: Payment, data: PaystackTrans
 
   // Tell people once the payment is safely recorded.
   if (applied === "order") {
-    await events.orderPaidOnline(await prisma.order.findUniqueOrThrow({ where: { id: payment.orderId! } }))
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: payment.orderId! } })
+    await events.orderPaidOnline(order)
+    await autoAssign(order)
   } else if (applied) {
     const sub = await prisma.subscription.findUniqueOrThrow({ where: { id: payment.subscriptionId! } })
     await (applied === "activated" ? events.planActivated(sub) : events.planRenewed(sub))

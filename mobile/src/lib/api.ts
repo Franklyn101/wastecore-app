@@ -5,6 +5,7 @@ import type {
   AdminSubscription,
   AdminSummary,
   AdminArea,
+  AdminRefund,
   AdminTicket,
   AreaCheck,
   Catalog,
@@ -12,15 +13,23 @@ import type {
   CollectorJob,
   CollectorJobs,
   CollectorProfile,
+  CustomerDetail,
+  CustomerSummary,
+  Dashboard,
   Earnings,
+  ExportKind,
   Order,
   OrderStatus,
   Payment,
   PaymentRecord,
   PlanChangeQuote,
+  Refund,
   RouteStop,
   SavedAddress,
   ServiceArea,
+  StockLevel,
+  StockMovement,
+  StockSize,
   Subscription,
   SupportTicket,
   TicketStatus,
@@ -71,6 +80,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(data.error ?? "Something went wrong. Please try again.", res.status)
   }
   return data as T
+}
+
+/** For non-JSON responses such as CSV exports. */
+async function requestText(path: string): Promise<string> {
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${path}`, { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} })
+  } catch {
+    throw new ApiError("Can't reach WasteCore. Check your internet connection and try again.", 0)
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(data.error ?? "Something went wrong. Please try again.", res.status)
+  }
+  return res.text()
 }
 
 const patch = <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) })
@@ -135,6 +159,7 @@ export const api = {
   areas: () => request<{ areas: ServiceArea[] }>("/areas"),
   locate: (point: { lat: number; lng: number }) =>
     request<AreaCheck>(`/areas/locate${query({ lat: String(point.lat), lng: String(point.lng) })}`),
+  fullDays: (areaId: string) => request<{ fullDays: string[] }>(`/areas/${areaId}/full-days`),
   notifyMe: (point: { lat: number; lng: number }) => post<{ ok: true }>("/areas/interest", point),
   addresses: () => request<{ addresses: SavedAddress[] }>("/addresses"),
   createAddress: (body: AddressInput) => post<{ address: SavedAddress }>("/addresses", body),
@@ -150,7 +175,7 @@ export const api = {
 
   createOrder: (body: NewOrder) => post<{ order: Order }>("/orders", body),
   orders: () => request<{ orders: Order[] }>("/orders"),
-  order: (id: string) => request<{ order: Order }>(`/orders/${id}`),
+  order: (id: string) => request<{ order: Order; refunds?: Refund[] }>(`/orders/${id}`),
   cancelOrder: (id: string) => post<{ order: Order }>(`/orders/${id}/cancel`),
   reschedule: (id: string, body: { date: string; timeWindow: TimeWindow | null }) =>
     post<{ order: Order }>(`/orders/${id}/reschedule`, body),
@@ -191,7 +216,22 @@ export const api = {
     summary: () => request<AdminSummary>("/admin/summary"),
     orders: (params: { status?: OrderStatus; q?: string; areaId?: string } = {}) =>
       request<{ orders: AdminOrder[] }>(`/admin/orders${query(params)}`),
-    order: (id: string) => request<{ order: AdminOrder }>(`/admin/orders/${id}`),
+    order: (id: string) => request<{ order: AdminOrder; refunds: Refund[] }>(`/admin/orders/${id}`),
+    refund: (id: string, body: { amount: number; reason: string; cancel: boolean }) =>
+      post<{ refund: Refund; left: number }>(`/admin/orders/${id}/refund`, body),
+    refunds: () => request<{ refunds: AdminRefund[] }>("/admin/refunds"),
+    dashboard: () => request<Dashboard>("/admin/dashboard"),
+    autoAssign: () => post<{ assigned: number }>("/admin/auto-assign"),
+    customers: (params: { q?: string; suspended?: "true" | "false" } = {}) =>
+      request<{ customers: CustomerSummary[] }>(`/admin/customers${query(params)}`),
+    customer: (id: string) => request<CustomerDetail>(`/admin/customers/${id}`),
+    suspendCustomer: (id: string, reason: string) => post<{ ok: true }>(`/admin/customers/${id}/suspend`, { reason }),
+    restoreCustomer: (id: string) => post<{ ok: true }>(`/admin/customers/${id}/restore`),
+    stock: () => request<{ sizes: StockSize[]; movements: StockMovement[] }>("/admin/stock"),
+    changeStock: (size: string, body: { change: number; reason: string; lowAt?: number }) =>
+      post<{ sizes: StockLevel[] }>(`/admin/stock/${size}`, body),
+    /** A CSV report as text (sent with the staff member's sign-in). */
+    exportCsv: (kind: ExportKind, range: { from: string; to: string }) => requestText(`/admin/exports/${kind}.csv${query(range)}`),
     updateOrder: (
       id: string,
       body: { status?: OrderStatus; collectorId?: string | null; adminNote?: string | null; customerNote?: string | null },
@@ -216,7 +256,7 @@ export const api = {
     updateCollector: (id: string, body: Partial<Omit<Collector, "id">>) =>
       patch<{ collector: Collector }>(`/admin/collectors/${id}`, body),
     areas: () => request<{ areas: AdminArea[] }>("/admin/areas"),
-    updateArea: (id: string, body: { active?: boolean; radiusKm?: number }) =>
+    updateArea: (id: string, body: { active?: boolean; radiusKm?: number; autoAssign?: boolean; dailyCapacity?: number | null }) =>
       patch<{ area: ServiceArea }>(`/admin/areas/${id}`, body),
     tickets: (status?: TicketStatus) => request<{ tickets: AdminTicket[] }>(`/admin/support-tickets${query({ status })}`),
     updateTicket: (id: string, status: TicketStatus) =>

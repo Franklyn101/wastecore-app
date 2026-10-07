@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Switch, Text, View } from "react-native"
 import { MapView } from "../../components/MapView"
-import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen } from "../../components/ui"
+import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField } from "../../components/ui"
 import { api } from "../../lib/api"
 import { confirmAction } from "../../lib/dialogs"
 import type { AdminArea } from "../../lib/types"
@@ -19,7 +19,7 @@ export default function AdminAreas() {
 
   const focus = data.find((a) => a.id === selected) ?? data.find((a) => a.active) ?? data[0]
 
-  function save(area: AdminArea, body: { active?: boolean; radiusKm?: number }) {
+  function save(area: AdminArea, body: { active?: boolean; radiusKm?: number; autoAssign?: boolean; dailyCapacity?: number | null }) {
     void action.submit(async () => {
       const { area: updated } = await api.admin.updateArea(area.id, body)
       setData((list) => list?.map((a) => (a.id === area.id ? { ...a, ...updated } : a)) ?? null)
@@ -78,11 +78,47 @@ export default function AdminAreas() {
               onPress={() => save(area, { radiusKm: Math.min(100, area.radiusKm + 5) })}
             />
           </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Text style={font.label}>Auto-assign</Text>
+              <Text style={font.muted}>Paid orders go to the on-duty collector here with the fewest jobs that day.</Text>
+            </View>
+            <Switch
+              accessibilityLabel={`${area.name} auto-assign`}
+              value={area.autoAssign}
+              onValueChange={(v) => save(area, { autoAssign: v })}
+              trackColor={{ true: colors.primary }}
+              disabled={action.busy}
+            />
+          </View>
+          <CapacityField area={area} busy={action.busy} onSave={(dailyCapacity) => save(area, { dailyCapacity })} />
           <Text style={[font.muted, { color: colors.primary }]} onPress={() => setSelected(area.id)}>
             Show on map
           </Text>
         </Card>
       ))}
     </Screen>
+  )
+}
+
+/** Most pickups a day in an area; empty means no limit. */
+function CapacityField({ area, busy, onSave }: { area: AdminArea; busy: boolean; onSave: (value: number | null) => void }) {
+  const [value, setValue] = useState(area.dailyCapacity ? String(area.dailyCapacity) : "")
+  const parsed = value.trim() ? Number(value.replace(/\D/g, "")) : null
+  const changed = parsed !== area.dailyCapacity
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing.sm }}>
+      <View style={{ flex: 1 }}>
+        <TextField
+          label="Pickups per day (limit)"
+          placeholder="No limit"
+          keyboardType="number-pad"
+          value={value}
+          onChangeText={setValue}
+          hint={`Today: ${area.openOrders} open orders`}
+        />
+      </View>
+      {changed ? <Button title="Save" variant="secondary" disabled={busy || parsed === 0} onPress={() => onSave(parsed)} /> : null}
+    </View>
   )
 }

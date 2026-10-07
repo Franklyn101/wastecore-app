@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
+import { RefundSection } from "../../../components/RefundForm"
 import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Section, TextField } from "../../../components/ui"
 import { api } from "../../../lib/api"
 import { confirmAction } from "../../../lib/dialogs"
@@ -53,7 +54,8 @@ export default function ManageOrder() {
 
   function update(body: Update, after?: () => void) {
     void action.submit(async () => {
-      setData(await api.admin.updateOrder(order!.id, body))
+      const { order: updated } = await api.admin.updateOrder(order!.id, body)
+      setData((d) => ({ order: updated, refunds: d?.refunds ?? [] }))
       after?.()
     })
   }
@@ -200,6 +202,8 @@ export default function ManageOrder() {
           {order.customerNote ? <Row label="Message to customer" value={order.customerNote} /> : null}
         </Card>
       </Section>
+
+      <RefundSection order={order} refunds={data.refunds} onRefunded={refresh} />
 
       <Section title="Notes for the collector">
         <TextField

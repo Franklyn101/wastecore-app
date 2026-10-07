@@ -28,6 +28,8 @@ export function signToken(user: Pick<User, "id" | "passwordChangedAt">): string 
 }
 
 /** Loads the signed-in user from the Bearer token, or rejects with 401. */
+export const SUSPENDED_MESSAGE = "Your account has been suspended. Please contact WasteCore support."
+
 export async function requireUser(req: Request, _res: Response, next: NextFunction) {
   const token = req.headers.authorization?.replace(/^Bearer /, "")
   if (!token) throw new HttpError(401, "Please sign in.")
@@ -44,6 +46,7 @@ export async function requireUser(req: Request, _res: Response, next: NextFuncti
   if ((claims.pv ?? 0) !== passwordVersion(user)) {
     throw new HttpError(401, "Your password was changed. Please sign in again.")
   }
+  if (user.suspendedAt) throw new HttpError(401, SUSPENDED_MESSAGE)
 
   req.user = user
   next()

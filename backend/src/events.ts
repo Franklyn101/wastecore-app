@@ -227,6 +227,22 @@ export const events = {
     await notifyStaff({ title: "New collector application", body: `${name} (${area}) applied in the app.`, url: "/admin/collectors" })
   },
 
+  // ── Stock, refunds and accounts ─────────────────────────
+  async lowStock(name: string, packs: number) {
+    await notifyStaff({ title: "Bag stock running low", body: `${name} bags: ${packs} pack${packs === 1 ? "" : "s"} left.`, url: "/admin/stock" })
+  },
+
+  async refunded(order: Order, amount: number, method: "PAYSTACK" | "MANUAL") {
+    await notify(order.userId, {
+      title: "Refund on its way",
+      body:
+        method === "PAYSTACK"
+          ? `We've refunded ${naira(amount)} for ${order.reference}. It can take a few working days to reach your card or account.`
+          : `We've refunded ${naira(amount)} for ${order.reference} to your bank account.`,
+      url: customerUrl(order),
+    })
+  },
+
   // ── Areas ────────────────────────────────────────────────
   /** Everyone who tapped "Notify me" for this area hears that it's open. */
   async areaLaunched(area: ServiceArea) {

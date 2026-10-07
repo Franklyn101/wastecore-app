@@ -9,6 +9,7 @@ import { events } from "../events.ts"
 import { distanceKm } from "../areas.ts"
 import { earningsSummary, extraBagsCharge, payFor } from "../earnings.ts"
 import { collectorJob } from "../serializers.ts"
+import { bagsDelivered } from "../stock.ts"
 import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
 
 // The collector app: a driver's own jobs, and what they record on each one.
@@ -177,6 +178,7 @@ collectorRouter.post("/collector/jobs/:id/complete", imageUpload.single("proof")
     collectorPay: payFor(job, bagsCollected),
   })
   await events.completed(done)
+  await bagsDelivered(done)
   if (extraAmount && !extraPaidCash) await events.extraBagsDue(done)
   res.json({ job: collectorJob(done) })
 })

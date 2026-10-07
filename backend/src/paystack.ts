@@ -94,6 +94,16 @@ export function chargeAuthorization(input: {
   })
 }
 
+export type PaystackRefund = { id: number; status: string; amount: number }
+
+/** Refunds part or all of a successful transaction to the customer's card or account. */
+export function createRefund(input: { reference: string; amountKobo: number; note: string }) {
+  return call<PaystackRefund>("/refund", {
+    method: "POST",
+    body: JSON.stringify({ transaction: input.reference, amount: input.amountKobo, currency: "NGN", merchant_note: input.note }),
+  })
+}
+
 /** Paystack signs webhook bodies with HMAC-SHA512 of the raw body using the secret key. */
 export function isValidWebhookSignature(rawBody: Buffer, signature: string | undefined): boolean {
   if (!signature || !paystackEnabled()) return false

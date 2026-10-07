@@ -54,6 +54,11 @@ function RootNavigator() {
         <Stack.Screen name="admin/collector" options={{ title: "Collector" }} />
         <Stack.Screen name="admin/plans/[id]" options={{ title: "Customer plan" }} />
         <Stack.Screen name="admin/areas" options={{ title: "Service areas" }} />
+        <Stack.Screen name="admin/customers/index" options={{ title: "Customers" }} />
+        <Stack.Screen name="admin/customers/[id]" options={{ title: "Customer" }} />
+        <Stack.Screen name="admin/stock" options={{ title: "Bag stock" }} />
+        <Stack.Screen name="admin/refunds" options={{ title: "Refunds" }} />
+        <Stack.Screen name="admin/exports" options={{ title: "Reports" }} />
       </Stack.Protected>
       <Stack.Protected guard={isCollector}>
         <Stack.Screen name="collector/(tabs)" options={{ headerShown: false }} />

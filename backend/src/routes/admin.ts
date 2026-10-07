@@ -3,7 +3,9 @@ import { Router } from "express"
 import { z } from "zod"
 import { publicArea } from "../areas.ts"
 import { currentUser, requireAdmin, requireUser } from "../auth.ts"
+import { autoAssign } from "../assign.ts"
 import { earningsSummary } from "../earnings.ts"
+import { bagsDelivered } from "../stock.ts"
 import { prisma } from "../db.ts"
 import type { Order, Prisma } from "../generated/prisma/client.ts"
 import { OrderStatus, OrderType, SubscriptionStatus, TicketStatus } from "../generated/prisma/enums.ts"
@@ -61,6 +63,8 @@ const updateAreaSchema = z
     radiusKm: z.number().min(1, "Radius must be at least 1 km.").max(100, "Radius can be at most 100 km.").optional(),
     centerLat: z.number().min(-90).max(90).optional(),
     centerLng: z.number().min(-180).max(180).optional(),
+    autoAssign: z.boolean().optional(),
+    dailyCapacity: z.number().int().min(1).max(10000).nullable().optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), "Nothing to update.")
 
@@ -109,7 +113,9 @@ adminRouter.get("/admin/orders", async (req, res) => {
 })
 
 adminRouter.get("/admin/orders/:id", async (req, res) => {
-  res.json({ order: adminOrder(await findOrder(req.params.id)) })
+  const order = await findOrder(req.params.id)
+  const refunds = await prisma.refund.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } })
+  res.json({ order: adminOrder(order), refunds })
 })
 
 adminRouter.patch("/admin/orders/:id", async (req, res) => {
@@ -157,8 +163,11 @@ adminRouter.patch("/admin/orders/:id", async (req, res) => {
   // Conditional on the status we checked, so two staff acting at once can't both win.
   const updated = await prisma.order.updateMany({ where: { id: order.id, status: order.status }, data })
   if (updated.count === 0) throw new HttpError(409, "This order was just changed by someone else. Refresh and try again.")
-  const after = await findOrder(order.id)
+  let after = await findOrder(order.id)
   await announceOrderChange(order, after)
+  if (after.status === "COMPLETED" && order.status !== "COMPLETED") await bagsDelivered(after, currentUser(req).id)
+  // Marked as paid without choosing a collector: let auto-assign pick one.
+  if (order.status === "AWAITING_PAYMENT" && after.status === "PENDING" && (await autoAssign(after))) after = await findOrder(order.id)
   res.json({ order: adminOrder(after) })
 })
 

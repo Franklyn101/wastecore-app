@@ -1,6 +1,8 @@
 import { Router } from "express"
 import { z } from "zod"
 import { publicArea, locate, requireServedArea } from "../areas.ts"
+import { fullDays } from "../capacity.ts"
+import { today } from "../dates.ts"
 import { currentUser, requireCustomer, requireUser } from "../auth.ts"
 import { prisma } from "../db.ts"
 import type { Address } from "../generated/prisma/client.ts"
@@ -85,6 +87,12 @@ areasRouter.get("/areas/locate", async (req, res) => {
     nearest: nearest && publicArea(nearest),
     nearestKm: nearestKm === null ? null : Math.round(nearestKm),
   })
+})
+
+// Days an area is fully booked, so the app can grey them out in the date picker.
+areasRouter.get("/areas/:id/full-days", async (req, res) => {
+  const { days } = z.object({ days: z.coerce.number().int().min(1).max(60).default(30) }).parse(req.query)
+  res.json({ fullDays: await fullDays(String(req.params.id), today(), days) })
 })
 
 // "Tell me when you launch here."

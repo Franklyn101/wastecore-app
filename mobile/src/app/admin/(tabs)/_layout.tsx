@@ -23,6 +23,7 @@ export default function AdminTabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Orders", tabBarIcon: icon("file-tray-full-outline") }} />
+      <Tabs.Screen name="overview" options={{ title: "Overview", tabBarIcon: icon("stats-chart-outline") }} />
       <Tabs.Screen name="plans" options={{ title: "Plans", tabBarIcon: icon("calendar-outline") }} />
       <Tabs.Screen name="collectors" options={{ title: "Collectors", tabBarIcon: icon("people-outline") }} />
       <Tabs.Screen name="tickets" options={{ title: "Tickets", tabBarIcon: icon("chatbubbles-outline") }} />

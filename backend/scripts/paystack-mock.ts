@@ -102,6 +102,14 @@ export function startMockPaystack(port = 4599): Promise<MockPaystack> {
       return send(200, { status: true, message: "Verification successful", data: view(t) })
     }
 
+    if (url.pathname === "/refund" && req.method === "POST") {
+      const t = transactions.get(body.transaction)
+      if (!t || t.status !== "success") return send(400, { status: false, message: "Transaction not found or not successful" })
+      const amount = body.amount ?? t.amount
+      if (amount > t.amount) return send(400, { status: false, message: "Refund amount is more than the transaction amount" })
+      return send(200, { status: true, message: "Refund has been queued for processing", data: { id: Date.now(), status: "pending", amount } })
+    }
+
     if (url.pathname === "/transaction/charge_authorization" && req.method === "POST") {
       const t: Txn = {
         reference: body.reference,

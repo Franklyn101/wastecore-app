@@ -220,6 +220,9 @@ export type ServiceArea = {
   centerLng: number
   radiusKm: number
   active: boolean
+  autoAssign: boolean
+  /** Most pickups per day; null means no limit. */
+  dailyCapacity: number | null
 }
 
 export type AreaCheck = {
@@ -273,3 +276,67 @@ export type CollectorProfile = {
   onDuty: boolean
   onDutySince: string | null
 }
+
+export type Refund = {
+  id?: string
+  amount: number
+  reason: string
+  method: "PAYSTACK" | "MANUAL"
+  status: "PENDING" | "PROCESSED" | "FAILED"
+  createdAt: string
+}
+
+export type AdminRefund = Refund & {
+  id: string
+  order: { id: string; reference: string }
+  user: { name: string; phone: string }
+}
+
+export type Dashboard = {
+  today: { due: number; done: number; notDone: number; unassigned: number; waitingPayment: number }
+  revenue: { today: number; last7Days: number; last30Days: number }
+  activePlans: number
+  newCustomers7Days: number
+  collectorsOnDuty: number
+  openTickets: number
+  rating: { average: number | null; count: number }
+  areas: { id: string; name: string; today: number; capacity: number | null; autoAssign: boolean }[]
+  stock: StockLevel[]
+}
+
+export type StockLevel = { size: string; name: string; packs: number; onOrder: number; available: number; lowAt: number }
+
+export type StockSize = StockLevel | { size: string; name: string; tracked: false }
+
+export type StockMovement = { id: string; size: string; change: number; reason: string; createdAt: string }
+
+export type CustomerSummary = {
+  id: string
+  name: string
+  phone: string
+  email: string | null
+  createdAt: string
+  orders: number
+  activePlan: string | null
+  suspended: boolean
+}
+
+export type CustomerDetail = {
+  customer: {
+    id: string
+    name: string
+    phone: string
+    email: string | null
+    createdAt: string
+    phoneVerified: boolean
+    suspendedAt: string | null
+    suspendedReason: string | null
+    paidOnline: number
+    tickets: number
+  }
+  orders: Order[]
+  plans: { id: string; plan: string; status: SubscriptionStatus; currentPeriodEnd: string | null }[]
+  addresses: { id: string; label: string; address: string; landmark: string | null }[]
+}
+
+export type ExportKind = "orders" | "payments" | "customers" | "payouts" | "refunds"

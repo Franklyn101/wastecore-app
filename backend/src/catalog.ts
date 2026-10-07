@@ -133,6 +133,8 @@ export type BagSizeId = (typeof BAG_SIZES)[number]["id"]
 export const planIds = PLANS.map((p) => p.id) as [string, ...string[]]
 export const bagSizeIds = BAG_SIZES.map((b) => b.id) as [BagSizeId, ...BagSizeId[]]
 
+export const findBagSize = (id: string) => BAG_SIZES.find((b) => b.id === id)
+
 export function findPlan(id: string): Plan {
   const plan = PLANS.find((p) => p.id === id)
   if (!plan) throw new Error(`Unknown plan ${id}`)

@@ -56,7 +56,17 @@ Staff use the **same app**. When someone with an admin account signs in, they ge
 | **Orders** | A queue filtered by status (To do, Assigned, Unpaid, …) with counts, plus search by reference, customer name or phone. Open an order to view the receipt, then **confirm the payment and assign a collector** (or activate an upgrade plan), **reject the receipt** with a message the customer sees, mark the order completed or incomplete, change the collector, cancel it, or keep an internal note. One tap calls or WhatsApps the customer. |
 | **Plans** | Every customer plan with its period and renewal. Set a plan's regular collector, who is then assigned all its pickups. |
 | **Collectors** | Add drivers, edit their details (including the city they work in), and deactivate them. |
-| **Tickets** | Support tickets by status: call the customer, start, resolve or reopen. |
+| **Overview** | The day at a glance: pickups due, done and not done, orders needing a collector, receipts to check, collectors on duty, each area's pickups against its daily limit, money in (today, 7 and 30 days, after refunds), active plans, new customers, ratings and low bag stock. Links to Customers, Bag stock, Refunds, Reports and Service areas. |
+| **Tickets** | Support tickets by status: call the customer, start, resolve or reopen. Tickets raised from an order link to it. |
+
+More staff tools:
+
+- **Customers.** Search by name or phone, see a customer's addresses, plans, orders and payments, call or WhatsApp them, and **suspend** an account (with a reason kept for staff). A suspended customer is signed out and can't sign in until restored.
+- **Refunds.** From any paid order: refund part or all of what was paid. Orders paid online are refunded through Paystack automatically; for bank transfers staff send the money and record it. Optionally cancel the order at the same time. The customer is notified and sees the refund on the order and in their payment history. **Overview → Refunds** lists them all.
+- **Auto-assign.** Per area. When on, an order that's paid goes straight to the on-duty collector in that area with the fewest jobs that day. **Auto-assign waiting orders** on the Overview catches up on anything left.
+- **Daily limit.** Per area, the most pickups a day. Full days are hidden from the date picker, "as soon as possible" moves to the next day with room, and rescheduling onto a full day is refused. Plan pickups always go ahead and count toward the limit.
+- **Bag stock.** Staff add stock per bag size (and write off damaged packs). Packs come out of stock when a bag order is delivered, orders larger than what's available are refused, and staff are warned when a size runs low. Sizes without stock entered aren't limited.
+- **Reports.** CSV downloads of orders, payments, refunds, collector payouts and new customers for the last 7, 30, 90 or 365 days. They open in Excel or Google Sheets.
 
 Admin accounts are created with `npm run db:create-admin` (see below). The server checks the role on every admin request; a customer who opens an admin link gets nothing.
 
@@ -289,11 +299,21 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | GET | `/payments/paystack/callback` | Paystack | Browser return after checkout; sends the customer back to the app |
 | POST | `/payments/paystack/webhook` | Paystack | Signed payment notifications |
 | GET | `/admin/summary` | admin | Order counts by status and number of open tickets |
-| GET / PATCH | `/admin/areas`, `/admin/areas/:id` | admin | Cities with counts; `{ active?, radiusKm? }` launches, pauses or resizes one |
+| GET / PATCH | `/admin/areas`, `/admin/areas/:id` | admin | Cities with counts; `{ active?, radiusKm?, autoAssign?, dailyCapacity? }` |
 | GET | `/admin/orders?status=&type=&areaId=&q=` | admin | Orders with customer and collector details; `q` searches reference, name and phone |
 | GET | `/admin/orders/:id` | admin | One order |
 | PATCH | `/admin/orders/:id` | admin | `{ status?, collectorId?, adminNote?, customerNote? }`. Only valid status moves are accepted (see the lifecycle above). |
 | GET / POST / PATCH | `/admin/collectors` | admin | Manage collectors |
+| GET | `/admin/dashboard` | admin | The Overview numbers |
+| POST | `/admin/auto-assign` | admin | Assigns waiting paid orders due by tomorrow in auto-assign areas |
+| GET | `/admin/customers?q=&suspended=` | admin | Customer list |
+| GET | `/admin/customers/:id` | admin | One customer with orders, plans and addresses |
+| POST | `/admin/customers/:id/suspend`, `/restore` | admin | `{ reason }` to suspend; restore lifts it |
+| POST | `/admin/orders/:id/refund` | admin | `{ amount, reason, cancel? }`: Paystack refund, or a manual one for transfers |
+| GET | `/admin/refunds` | admin | All refunds |
+| GET / POST | `/admin/stock`, `/admin/stock/:size` | admin | Stock levels and recent changes; `{ change, reason, lowAt? }` to restock or write off |
+| GET | `/admin/exports/:kind.csv?from=&to=` | admin | CSV of `orders`, `payments`, `refunds`, `payouts` or `customers` |
+| GET | `/areas/:id/full-days` | public | Days an area is fully booked |
 | GET / PATCH | `/admin/support-tickets?status=` | admin | View and update tickets |
 | POST | `/admin/collectors/:id/approve` | admin | Approves a collector who applied in the app |
 | POST | `/admin/collectors/:id/reject` | admin | Turns down an application and removes its login |

@@ -49,5 +49,7 @@ export function publicArea(a: ServiceArea) {
     centerLng: a.centerLng,
     radiusKm: a.radiusKm,
     active: a.active,
+    autoAssign: a.autoAssign,
+    dailyCapacity: a.dailyCapacity,
   }
 }

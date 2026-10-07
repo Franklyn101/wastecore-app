@@ -1,5 +1,5 @@
 import { router } from "expo-router"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Text, View } from "react-native"
 import { AddressPicker } from "../../components/AddressPicker"
 import { DatePicker } from "../../components/DatePicker"
@@ -17,6 +17,8 @@ import { font, spacing } from "../../theme"
 export default function BookPickup() {
   const { catalog, error: catalogError, reload } = useCatalog()
   const [addressId, setAddressId] = useState<string | null>(null)
+  const [areaId, setAreaId] = useState<string | null>(null)
+  const [fullDays, setFullDays] = useState<string[]>([])
   const [wasteType, setWasteType] = useState<string | null>(null)
   const [otherWaste, setOtherWaste] = useState("")
   const [bags, setBags] = useState(1)
@@ -24,6 +26,12 @@ export default function BookPickup() {
   const [date, setDate] = useState<string | null>(null)
   const [timeWindow, setTimeWindow] = useState<TimeWindow | null>(null)
   const { busy, error, submit } = useSubmit()
+
+  // Days the customer's area is fully booked.
+  useEffect(() => {
+    if (!areaId) return setFullDays([])
+    api.fullDays(areaId).then((r) => setFullDays(r.fullDays)).catch(() => setFullDays([]))
+  }, [areaId])
 
   if (!catalog) return catalogError ? <ErrorBanner message={catalogError} onRetry={reload} /> : <Loading />
 
@@ -53,7 +61,14 @@ export default function BookPickup() {
     <Screen>
       <Text style={font.muted}>One-time pickup, no subscription needed. {naira(instant.pricePerBag)} per bag.</Text>
 
-      <AddressPicker label="Pickup address" value={addressId} onChange={setAddressId} />
+      <AddressPicker
+        label="Pickup address"
+        value={addressId}
+        onChange={(id, a) => {
+          setAddressId(id)
+          setAreaId(a?.areaId ?? null)
+        }}
+      />
 
       <View style={{ gap: spacing.sm }}>
         <Text style={font.label}>Waste type</Text>
@@ -86,7 +101,7 @@ export default function BookPickup() {
         <OptionCard title="Choose a date" selected={when === "date"} onPress={() => setWhen("date")} />
         {when === "date" ? (
           <>
-            <DatePicker label="Pickup date" value={date} onChange={setDate} />
+            <DatePicker label="Pickup date" value={date} onChange={setDate} unavailable={fullDays} />
             <TimeWindowPicker value={timeWindow} onChange={setTimeWindow} />
           </>
         ) : null}

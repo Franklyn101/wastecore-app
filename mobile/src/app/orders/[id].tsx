@@ -257,6 +257,21 @@ export default function OrderDetails() {
         ) : null}
       </Card>
 
+      {data?.refunds?.length ? (
+        <Card>
+          <Text style={font.label}>Refunds</Text>
+          {data.refunds.map((r, i) => (
+            <View key={i} style={{ gap: 2 }}>
+              <Row label={formatDate(r.createdAt)} value={naira(r.amount)} />
+              <Text style={font.muted}>
+                {r.reason}
+                {r.method === "PAYSTACK" && r.status === "PENDING" ? " · on its way to your card or account" : ""}
+              </Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
       {current.receiptUrl ? (
         <Card>
           <Text style={font.label}>Your receipt</Text>
