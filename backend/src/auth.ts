@@ -57,6 +57,7 @@ export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
 /** Customer-only routes (ordering, plans, payments, support). Staff and collectors use their own. */
 export function requireCustomer(req: Request, _res: Response, next: NextFunction) {
   if (req.user?.role !== "CUSTOMER") throw new HttpError(403, "This is for customer accounts.")
+  if (!req.user.phoneVerifiedAt) throw new HttpError(403, "Please verify your phone number first.")
   next()
 }
 
@@ -71,6 +72,7 @@ export async function requireCollector(req: Request, _res: Response, next: NextF
 
 /** Jobs are only for collectors staff have approved. */
 export function requireApprovedCollector(req: Request, _res: Response, next: NextFunction) {
+  if (!req.user?.phoneVerifiedAt) throw new HttpError(403, "Please verify your phone number first.")
   if (!req.collector?.approvedAt) {
     throw new HttpError(403, "Your collector account is waiting for approval by the WasteCore office.")
   }
@@ -89,5 +91,13 @@ export function currentUser(req: Request): User {
 }
 
 export function publicUser(user: User) {
-  return { id: user.id, name: user.name, phone: user.phone, email: user.email, address: user.address, role: user.role }
+  return {
+    id: user.id,
+    name: user.name,
+    phone: user.phone,
+    phoneVerified: Boolean(user.phoneVerifiedAt),
+    email: user.email,
+    address: user.address,
+    role: user.role,
+  }
 }

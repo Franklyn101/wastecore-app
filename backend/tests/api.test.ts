@@ -4,7 +4,7 @@ import { createApp } from "../src/app.ts"
 import { asapDate } from "../src/routes/orders.ts"
 import { prisma } from "../src/db.ts"
 import { normalizePhone, todayInLagos } from "../src/validation.ts"
-import { resetDatabase } from "./helpers.ts"
+import { resetDatabase, verifyPhone } from "./helpers.ts"
 
 const app = createApp()
 const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
@@ -14,6 +14,7 @@ const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 
 async function register(phone = "08012345678", name = "Ada Obi") {
   const res = await request(app).post("/auth/register").send({ name, phone, password: "password123" })
   expect(res.status).toBe(201)
+  await verifyPhone(res.body.user.id)
   return res.body.token as string
 }
 

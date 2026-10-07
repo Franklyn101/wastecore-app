@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit"
 import { z } from "zod"
 import { currentUser, publicUser, requireUser, signToken } from "../auth.ts"
 import { config } from "../config.ts"
+import { issueCode } from "../codes.ts"
 import { prisma } from "../db.ts"
 import { events } from "../events.ts"
 import { HttpError } from "../http.ts"
@@ -51,10 +52,24 @@ const authLimiter = rateLimit({
   message: { error: "Too many attempts. Please wait a few minutes and try again." },
 })
 
+/**
+ * Stops a number being blocked by someone who typed it by mistake: an unverified customer
+ * account (which can't have orders, plans or tickets) gives way to a new sign-up. Only the
+ * person who receives the SMS code can then verify it. Any other account on the number blocks.
+ */
+async function freeUnverifiedNumber(phone: string) {
+  const existing = await prisma.user.findUnique({ where: { phone } })
+  if (!existing) return
+  if (existing.role === "CUSTOMER" && !existing.phoneVerifiedAt) {
+    await prisma.user.delete({ where: { id: existing.id } })
+    return
+  }
+  throw new HttpError(409, "An account with this phone number already exists. Please sign in.")
+}
+
 authRouter.post("/auth/register", authLimiter, async (req, res) => {
   const body = registerSchema.parse(req.body)
-  const existing = await prisma.user.findUnique({ where: { phone: body.phone } })
-  if (existing) throw new HttpError(409, "An account with this phone number already exists. Please sign in.")
+  await freeUnverifiedNumber(body.phone)
 
   const user = await prisma.user.create({
     data: {
@@ -64,15 +79,14 @@ authRouter.post("/auth/register", authLimiter, async (req, res) => {
       passwordHash: await bcrypt.hash(body.password, BCRYPT_ROUNDS),
     },
   })
+  await issueCode(user, "PHONE_VERIFY")
   res.status(201).json({ token: signToken(user), user: publicUser(user) })
 })
 
 // Collectors can sign themselves up; they see no jobs until staff approve them.
 authRouter.post("/auth/register-collector", authLimiter, async (req, res) => {
   const body = registerCollectorSchema.parse(req.body)
-  if (await prisma.user.findUnique({ where: { phone: body.phone } })) {
-    throw new HttpError(409, "An account with this phone number already exists. Please sign in.")
-  }
+  await freeUnverifiedNumber(body.phone)
   const passwordHash = await bcrypt.hash(body.password, BCRYPT_ROUNDS)
 
   const user = await prisma.$transaction(async (tx) => {
@@ -91,6 +105,7 @@ authRouter.post("/auth/register-collector", authLimiter, async (req, res) => {
     }
     return user
   })
+  await issueCode(user, "PHONE_VERIFY")
   await events.collectorApplied(body.name, body.area)
   res.status(201).json({ token: signToken(user), user: publicUser(user) })
 })

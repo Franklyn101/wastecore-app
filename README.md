@@ -57,6 +57,16 @@ Deactivating a collector, or removing their login, stops them signing in.
 
 Collectors only see jobs assigned to them, and never see prices or payment details. The customer sees the collector's note, the photo, and the reason if a pickup couldn't be done. Staff see all of it on the order, with times.
 
+## Phone verification
+
+New customers and collectors get a 6-digit code by SMS when they sign up, and enter it on a **Verify your phone** screen before they can use the app. Collectors who apply in the app verify first, then wait for staff approval.
+
+- Unverified accounts can't place orders, subscribe, pay, raise tickets or see collector jobs; the server enforces this.
+- Codes work like password reset codes (15 minutes, 5 wrong tries, resend once a minute).
+- **Already verified:** staff accounts, collector logins staff create, and accounts that existed before this feature.
+- Resetting a password with an SMS code also verifies the phone.
+- **Typed the wrong number?** A new sign-up replaces an unverified customer account on the same number, so a typo can't block the real owner. Only the person who receives the code can verify it.
+
 ## Passwords
 
 - **Forgot password?** on the sign-in screen. The person enters their phone number and gets a 6-digit code by **SMS** (Termii), and also by **email** if the account has one. They enter the code and a new password, and they're signed in.
@@ -171,6 +181,8 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | POST | `/auth/register-collector` | public | `{ name, phone, password, area }`: applies as a collector (needs staff approval) |
 | POST | `/auth/password-reset/request` | public | `{ phone }`: texts (and emails) a 6-digit code |
 | POST | `/auth/password-reset/confirm` | public | `{ phone, code, password }` → `{ token, user }` |
+| POST | `/me/phone/send-code` | any | Sends a new verification code (once a minute) |
+| POST | `/me/phone/verify` | any | `{ code }` → the verified user |
 | POST | `/me/password` | any | `{ currentPassword, password }` → a new token; other devices are signed out |
 | POST | `/admin/users/password` | admin | `{ phone, password }`: temporary password for a customer or collector |
 | POST | `/auth/login` | public | `{ phone, password }` → `{ token, user }` (customers, staff and collectors) |
@@ -237,4 +249,3 @@ Set `EXPO_PUBLIC_API_URL` to the production API URL in your EAS environment.
 ## Next steps
 
 - **Deploy** the API and database, and turn on Cloudinary, so the team can test on real phones.
-- **Phone number verification** at sign-up, reusing the SMS code sender built for password reset.

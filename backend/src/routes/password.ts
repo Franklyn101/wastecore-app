@@ -1,34 +1,25 @@
-import { createHmac, randomInt, timingSafeEqual } from "node:crypto"
 import bcrypt from "bcryptjs"
 import { Router } from "express"
 import rateLimit from "express-rate-limit"
 import { z } from "zod"
 import { currentUser, publicUser, requireAdmin, requireUser, signToken } from "../auth.ts"
+import { issueCode, RESEND_AFTER_SECONDS, useCode } from "../codes.ts"
 import { config } from "../config.ts"
 import { prisma } from "../db.ts"
 import type { User } from "../generated/prisma/client.ts"
 import { HttpError } from "../http.ts"
-import { sendEmail, sendSms } from "../messaging.ts"
 import { phoneSchema } from "../validation.ts"
-
-const CODE_TTL_MINUTES = 15
-const MAX_ATTEMPTS = 5
-const RESEND_AFTER_SECONDS = 60
-const MAX_CODES_PER_HOUR = 5
 
 const passwordSchema = z
   .string()
   .min(8, "Password must be at least 8 characters.")
   .max(128, "Password must be at most 128 characters.")
 
-const hashCode = (userId: string, code: string) =>
-  createHmac("sha256", config.jwtSecret).update(`${userId}:${code}`).digest()
-
 /** Saves a new password and signs the account out everywhere else. */
-async function setPassword(userId: string, password: string): Promise<User> {
+async function setPassword(userId: string, password: string, extra: { phoneVerifiedAt?: Date } = {}): Promise<User> {
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash: await bcrypt.hash(password, 12), passwordChangedAt: new Date() },
+    data: { passwordHash: await bcrypt.hash(password, 12), passwordChangedAt: new Date(), ...extra },
   })
   // Other devices are signed out, so they shouldn't keep getting this account's alerts either.
   await prisma.pushToken.deleteMany({ where: { userId } })
@@ -51,28 +42,7 @@ passwordRouter.post("/auth/password-reset/request", resetLimiter, async (req, re
   const { phone } = z.object({ phone: phoneSchema }).parse(req.body)
   const user = await prisma.user.findUnique({ where: { phone } })
 
-  if (user) {
-    const recent = await prisma.passwordReset.findMany({
-      where: { userId: user.id, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
-      orderBy: { createdAt: "desc" },
-    })
-    const tooSoon = recent[0] && Date.now() - recent[0].createdAt.getTime() < RESEND_AFTER_SECONDS * 1000
-    if (!tooSoon && recent.length < MAX_CODES_PER_HOUR) {
-      const code = randomInt(0, 1_000_000).toString().padStart(6, "0")
-      // Only the newest code works.
-      await prisma.passwordReset.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } })
-      await prisma.passwordReset.create({
-        data: {
-          userId: user.id,
-          codeHash: hashCode(user.id, code).toString("hex"),
-          expiresAt: new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000),
-        },
-      })
-      const text = `Your WasteCore code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes. Don't share it with anyone.`
-      sendSms(user.phone, text)
-      if (user.email) sendEmail(user.email, "Your WasteCore password reset code", `Hello ${user.name},\n\n${text}\n\nIf you didn't ask to reset your password, you can ignore this message.`)
-    }
-  }
+  if (user) await issueCode(user, "PASSWORD_RESET")
   res.json({
     message: `If ${phone} has a WasteCore account, we've sent a 6-digit code to it (and to the account's email, if it has one).`,
     resendAfterSeconds: RESEND_AFTER_SECONDS,
@@ -88,27 +58,13 @@ passwordRouter.post("/auth/password-reset/confirm", resetLimiter, async (req, re
       password: passwordSchema,
     })
     .parse(req.body)
-  const wrong = new HttpError(400, "That code is wrong or has expired. Check it, or request a new one.")
-
+  // Unknown numbers get the same "wrong code" error as wrong codes.
   const user = await prisma.user.findUnique({ where: { phone: body.phone } })
-  if (!user) throw wrong
-  const reset = await prisma.passwordReset.findFirst({
-    where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: "desc" },
-  })
-  if (!reset) throw wrong
-  if (reset.attempts >= MAX_ATTEMPTS) throw new HttpError(400, "Too many wrong codes. Request a new code.")
+  await useCode(user?.id ?? null, "PASSWORD_RESET", body.code)
+  if (!user) throw new HttpError(400, "That code is wrong or has expired.") // unreachable: useCode threw
 
-  const matches = timingSafeEqual(hashCode(user.id, body.code), Buffer.from(reset.codeHash, "hex"))
-  if (!matches) {
-    await prisma.passwordReset.update({ where: { id: reset.id }, data: { attempts: { increment: 1 } } })
-    throw wrong
-  }
-  // Use the code exactly once, even if two requests race.
-  const used = await prisma.passwordReset.updateMany({ where: { id: reset.id, usedAt: null }, data: { usedAt: new Date() } })
-  if (used.count === 0) throw wrong
-
-  const updated = await setPassword(user.id, body.password)
+  // Receiving the SMS code also proves the phone number works.
+  const updated = await setPassword(user.id, body.password, user.phoneVerifiedAt ? {} : { phoneVerifiedAt: new Date() })
   res.json({ token: signToken(updated), user: publicUser(updated) })
 })
 

@@ -104,6 +104,8 @@ export const api = {
     post<{ message: string; resendAfterSeconds: number }>("/auth/password-reset/request", { phone }),
   confirmPasswordReset: (body: { phone: string; code: string; password: string }) =>
     post<AuthResponse>("/auth/password-reset/confirm", body),
+  sendPhoneCode: () => post<{ sent: boolean; resendAfterSeconds: number }>("/me/phone/send-code"),
+  verifyPhone: (code: string) => post<{ user: User }>("/me/phone/verify", { code }),
   changePassword: (body: { currentPassword: string; password: string }) => post<AuthResponse>("/me/password", body),
   updateProfile: (body: { name?: string; address?: string; email?: string }) => patch<{ user: User }>("/me", body),
 

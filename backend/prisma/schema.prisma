@@ -73,6 +73,8 @@ model User {
   phone             String    @unique // E.164, e.g. +2348012345678
   email             String? // needed by Paystack for receipts; asked for at first online payment
   passwordHash      String
+  // Set once the person proves they can receive SMS on this number. Needed to use the app.
+  phoneVerifiedAt   DateTime?
   // Sign-in tokens issued before this are rejected, so changing a password signs out other devices.
   passwordChangedAt DateTime?
   role              Role      @default(CUSTOMER)
@@ -80,29 +82,35 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  orders         Order[]
-  tickets        SupportTicket[]
-  subscriptions  Subscription[]
-  payments       Payment[]
-  collector      Collector? // set when this login belongs to a collector
-  pushTokens     PushToken[]
-  notifications  Notification[]
-  passwordResets PasswordReset[]
+  orders        Order[]
+  tickets       SupportTicket[]
+  subscriptions Subscription[]
+  payments      Payment[]
+  collector     Collector? // set when this login belongs to a collector
+  pushTokens    PushToken[]
+  notifications Notification[]
+  oneTimeCodes  OneTimeCode[]
 }
 
-// A one-time code sent by SMS (and email) to reset a forgotten password.
-model PasswordReset {
-  id        String    @id @default(cuid())
+enum CodePurpose {
+  PASSWORD_RESET
+  PHONE_VERIFY
+}
+
+// A 6-digit code sent by SMS (and, for password resets, email).
+model OneTimeCode {
+  id        String      @id @default(cuid())
   userId    String
+  purpose   CodePurpose
   codeHash  String // HMAC of the code; the code itself is never stored
   expiresAt DateTime
-  attempts  Int       @default(0)
+  attempts  Int         @default(0)
   usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  createdAt DateTime    @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, createdAt])
+  @@index([userId, purpose, createdAt])
 }
 
 // An Expo push token for one of the user's devices.

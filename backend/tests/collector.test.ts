@@ -2,7 +2,7 @@ import request from "supertest"
 import { afterAll, beforeEach, describe, expect, it } from "vitest"
 import { createApp } from "../src/app.ts"
 import { prisma } from "../src/db.ts"
-import { resetDatabase } from "./helpers.ts"
+import { resetDatabase, verifyPhone } from "./helpers.ts"
 
 const app = createApp()
 const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
@@ -14,6 +14,7 @@ afterAll(() => prisma.$disconnect())
 
 async function register(phone: string, name: string): Promise<Auth> {
   const res = await request(app).post("/auth/register").send({ name, phone, password: "password123" })
+  await verifyPhone(res.body.user.id)
   return { Authorization: `Bearer ${res.body.token}` }
 }
 
@@ -184,6 +185,9 @@ describe("collector self sign-up", () => {
 
     await request(app).post(`/admin/collectors/${id}/approve`).set(admin).expect(200)
     expect((await request(app).get("/collector/me").set(tunde)).body.collector.status).toBe("APPROVED")
+    // Approved, but jobs also need a verified phone number.
+    expect((await request(app).get("/collector/jobs").set(tunde)).status).toBe(403)
+    await verifyPhone(res.body.user.id)
     expect((await request(app).get("/collector/jobs").set(tunde)).status).toBe(200)
     expect((await request(app).patch(`/admin/orders/${body.order.id}`).set(admin).send({ collectorId: id })).status).toBe(200)
   })

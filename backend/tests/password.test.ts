@@ -54,9 +54,12 @@ const confirm = (code: string, password = "new-password-1", phone = "08012345678
   request(app).post("/auth/password-reset/confirm").send({ phone, code, password })
 const login = (password: string) => request(app).post("/auth/login").send({ phone: "08012345678", password })
 
-async function latestCode() {
+const resetTexts = () => texts.filter((t) => t.sms.includes("password reset"))
+const verifyTexts = () => texts.filter((t) => t.sms.includes("verification"))
+
+async function latestCode(which = resetTexts) {
   await flushMessages()
-  return texts.at(-1)!.sms.match(/\b(\d{6})\b/)![1]
+  return which().at(-1)!.sms.match(/\b(\d{6})\b/)![1]
 }
 
 describe("password reset", () => {
@@ -67,7 +70,7 @@ describe("password reset", () => {
     expect(res.status).toBe(200)
     expect(res.body.message).toMatch(/If \+2348012345678 has a WasteCore account/)
     const code = await latestCode()
-    expect(texts[0]).toMatchObject({ to: "2348012345678", from: "WasteCore", api_key: "test-termii-key" })
+    expect(resetTexts()[0]).toMatchObject({ to: "2348012345678", from: "WasteCore", api_key: "test-termii-key" })
     expect(emails).toHaveLength(0) // no email on the account
 
     const done = await confirm(code)
@@ -101,7 +104,7 @@ describe("password reset", () => {
     await flushMessages()
     expect(unknown.status).toBe(200)
     expect(unknown.body.message.replace(/\+\d+/, "")).toBe(known.body.message.replace(/\+\d+/, ""))
-    expect(texts).toHaveLength(1)
+    expect(resetTexts()).toHaveLength(1)
     expect((await confirm("123456", "new-password-1", "08099999999")).status).toBe(400)
   })
 
@@ -110,7 +113,7 @@ describe("password reset", () => {
     await requestCode()
     await requestCode() // within a minute: no second text
     await flushMessages()
-    expect(texts).toHaveLength(1)
+    expect(resetTexts()).toHaveLength(1)
     const code = await latestCode()
     const wrong = code === "000000" ? "111111" : "000000"
 
@@ -124,7 +127,7 @@ describe("password reset", () => {
     await register()
     await requestCode()
     const code = await latestCode()
-    await prisma.passwordReset.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } })
+    await prisma.oneTimeCode.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } })
     expect((await confirm(code)).status).toBe(400)
   })
 })
@@ -156,5 +159,66 @@ describe("changing a password", () => {
 
     const customer = { Authorization: `Bearer ${(await login("temporary-1")).body.token}` }
     expect((await request(app).post("/admin/users/password").set(customer).send({ phone: "08099990000", password: "hijack-123" })).status).toBe(403)
+  })
+})
+
+describe("phone verification", () => {
+  it("texts a code at sign-up and unlocks the app once it's entered", async () => {
+    const res = await register()
+    expect(res.body.user.phoneVerified).toBe(false)
+    const auth = { Authorization: `Bearer ${res.body.token}` }
+    const code = await latestCode(verifyTexts)
+    expect(verifyTexts()[0].to).toBe("2348012345678")
+
+    // Signed in, but can't order until verified.
+    const order = { type: "INSTANT_PICKUP", address: "Yaba", wasteType: "Paper", asap: true }
+    const blocked = await request(app).post("/orders").set(auth).send(order)
+    expect(blocked.status).toBe(403)
+    expect(blocked.body.error).toMatch(/verify your phone/)
+
+    expect((await request(app).post("/me/phone/verify").set(auth).send({ code: code === "000000" ? "111111" : "000000" })).status).toBe(400)
+    const ok = await request(app).post("/me/phone/verify").set(auth).send({ code })
+    expect(ok.body.user.phoneVerified).toBe(true)
+    expect((await request(app).post("/orders").set(auth).send(order)).status).toBe(201)
+    expect((await request(app).post("/me/phone/send-code").set(auth)).status).toBe(409)
+  })
+
+  it("lets a new sign-up replace an unverified account on the same number", async () => {
+    const typo = await register() // someone typed this number by mistake and never verified
+    const owner = await request(app).post("/auth/register").send({ name: "Real Owner", phone: "08012345678", password: "owner-pass-1" })
+    expect(owner.status).toBe(201)
+    expect((await request(app).get("/me").set({ Authorization: `Bearer ${typo.body.token}` })).status).toBe(401)
+
+    // A verified account still blocks the number.
+    const auth = { Authorization: `Bearer ${owner.body.token}` }
+    await request(app).post("/me/phone/verify").set(auth).send({ code: await latestCode(verifyTexts) })
+    expect((await request(app).post("/auth/register").send({ name: "Someone", phone: "08012345678", password: "x-pass-123" })).status).toBe(409)
+  })
+
+  it("limits resends", async () => {
+    const res = await register()
+    const auth = { Authorization: `Bearer ${res.body.token}` }
+    const again = await request(app).post("/me/phone/send-code").set(auth) // within a minute of sign-up
+    expect(again.body).toMatchObject({ sent: false, resendAfterSeconds: 60 })
+    await flushMessages()
+    expect(verifyTexts()).toHaveLength(1)
+  })
+
+  it("counts a password reset by SMS as verifying the phone", async () => {
+    await register()
+    await requestCode()
+    const done = await confirm(await latestCode())
+    expect(done.body.user.phoneVerified).toBe(true)
+  })
+
+  it("doesn't need verifying for logins staff create", async () => {
+    const staffRes = await request(app).post("/auth/register").send({ name: "Staff", phone: "08099990000", password: "staff-pass-1" })
+    await prisma.user.update({ where: { id: staffRes.body.user.id }, data: { role: "ADMIN" } })
+    const staff = { Authorization: `Bearer ${staffRes.body.token}` }
+    const c = await request(app).post("/admin/collectors").set(staff).send({ name: "Musa", phone: "07011112222", area: "Ikeja" })
+    await request(app).put(`/admin/collectors/${c.body.collector.id}/login`).set(staff).send({ password: "musa-pass-123" })
+    const musa = await request(app).post("/auth/login").send({ phone: "07011112222", password: "musa-pass-123" })
+    expect(musa.body.user.phoneVerified).toBe(true)
+    expect((await request(app).get("/collector/jobs").set({ Authorization: `Bearer ${musa.body.token}` })).status).toBe(200)
   })
 })

@@ -12,9 +12,11 @@ function RootNavigator() {
 
   // Customers, staff and collectors use the same app; the screens they can reach depend on their role.
   // The server checks the role on every admin request, so this only shapes the UI.
-  const isCustomer = user?.role === "CUSTOMER"
+  // Customers and collectors confirm their phone number by SMS before anything else.
+  const needsVerifying = !!user && user.role !== "ADMIN" && !user.phoneVerified
+  const isCustomer = user?.role === "CUSTOMER" && !needsVerifying
   const isAdmin = user?.role === "ADMIN"
-  const isCollector = user?.role === "COLLECTOR"
+  const isCollector = user?.role === "COLLECTOR" && !needsVerifying
 
   return (
     <Stack
@@ -29,6 +31,9 @@ function RootNavigator() {
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         <Stack.Screen name="sign-up" options={{ title: "Create account" }} />
         <Stack.Screen name="forgot-password" options={{ title: "Reset password" }} />
+      </Stack.Protected>
+      <Stack.Protected guard={needsVerifying}>
+        <Stack.Screen name="verify-phone" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Protected guard={isCustomer}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

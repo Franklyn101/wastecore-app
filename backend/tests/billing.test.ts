@@ -6,7 +6,7 @@ import { createApp } from "../src/app.ts"
 import { runBillingJobs } from "../src/billing.ts"
 import { addDays, addPeriod, pickupDates, toDay, today, ymd } from "../src/dates.ts"
 import { prisma } from "../src/db.ts"
-import { resetDatabase } from "./helpers.ts"
+import { resetDatabase, verifyPhone } from "./helpers.ts"
 
 const app = createApp()
 let paystack: MockPaystack
@@ -27,6 +27,7 @@ beforeEach(async () => {
 
 async function customer(phone = "08012345678") {
   const res = await request(app).post("/auth/register").send({ name: "Ada Obi", phone, password: "password123" })
+  await verifyPhone(res.body.user.id)
   return { Authorization: `Bearer ${res.body.token}` }
 }
 

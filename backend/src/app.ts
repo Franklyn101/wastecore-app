@@ -12,6 +12,7 @@ import { passwordRouter } from "./routes/password.ts"
 import { paymentsRouter, paystackWebhook } from "./routes/payments.ts"
 import { subscriptionsRouter } from "./routes/subscriptions.ts"
 import { supportRouter } from "./routes/support.ts"
+import { verifyRouter } from "./routes/verify.ts"
 import { UPLOAD_DIR } from "./storage.ts"
 
 export function createApp() {
@@ -28,7 +29,7 @@ export function createApp() {
   })
   app.use("/uploads", express.static(UPLOAD_DIR, { fallthrough: false, index: false }))
 
-  app.use(authRouter, passwordRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, collectorRouter, notificationsRouter)
+  app.use(authRouter, passwordRouter, verifyRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, collectorRouter, notificationsRouter)
 
   app.use((_req, _res, next) => next(new HttpError(404, "Not found.")))
   app.use(errorHandler)

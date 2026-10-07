@@ -288,7 +288,8 @@ adminRouter.put("/admin/collectors/:id/login", async (req, res) => {
     await assertPhoneFree(collector.phone)
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { name: collector.name, phone: collector.phone, passwordHash, role: "COLLECTOR" },
+        // Staff set this login up themselves, so they vouch for the number.
+        data: { name: collector.name, phone: collector.phone, passwordHash, role: "COLLECTOR", phoneVerifiedAt: new Date() },
       })
       await tx.collector.update({ where: { id: collector.id }, data: { userId: user.id } })
     })

@@ -6,7 +6,7 @@ import { runBillingJobs } from "../src/billing.ts"
 import { addDays, today } from "../src/dates.ts"
 import { prisma } from "../src/db.ts"
 import { flushPushes } from "../src/notify.ts"
-import { resetDatabase } from "./helpers.ts"
+import { resetDatabase, verifyPhone } from "./helpers.ts"
 
 const app = createApp()
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00])
@@ -42,6 +42,7 @@ beforeEach(async () => {
 
 async function register(phone: string, name: string, role?: "ADMIN"): Promise<Auth> {
   const res = await request(app).post("/auth/register").send({ name, phone, password: "password123" })
+  await verifyPhone(res.body.user.id)
   if (role) await prisma.user.update({ where: { id: res.body.user.id }, data: { role } })
   return { Authorization: `Bearer ${res.body.token}` }
 }

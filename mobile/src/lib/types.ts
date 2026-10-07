@@ -4,6 +4,7 @@ export type User = {
   id: string
   name: string
   phone: string
+  phoneVerified: boolean
   email: string | null
   address: string | null
   role: "CUSTOMER" | "ADMIN" | "COLLECTOR"
