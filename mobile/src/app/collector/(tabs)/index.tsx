@@ -3,7 +3,7 @@ import { router } from "expo-router"
 import { useEffect, useState } from "react"
 import { Switch } from "react-native"
 import { JobCard } from "../../../components/JobCard"
-import { Button, Card, ErrorBanner, Loading, Screen, Section } from "../../../components/ui"
+import { Button, Card, ErrorBanner, Loading, Screen, Section, switchColors } from "../../../components/ui"
 import { api } from "../../../lib/api"
 import { notify } from "../../../lib/dialogs"
 import { loadJobs, useOfflineQueue } from "../../../lib/offline"
@@ -132,6 +132,7 @@ function OnDutySwitch() {
           <Text style={font.muted}>{onDuty ? "The office can give you new jobs." : "Switch on when you start work."}</Text>
         </View>
         <Switch
+          {...switchColors}
           accessibilityLabel="On duty"
           value={onDuty}
           disabled={busy}

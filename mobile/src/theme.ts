@@ -27,3 +27,12 @@ export const font = {
   label: { fontSize: 14, fontWeight: "600" as const, color: colors.text },
   muted: { fontSize: 13, color: colors.textMuted },
 }
+
+/** Soft lift for cards (works on iOS, Android and web). */
+export const shadow = {
+  card: { boxShadow: "0px 1px 2px rgba(16, 40, 20, 0.06), 0px 4px 14px rgba(16, 40, 20, 0.06)" },
+  raised: { boxShadow: "0px 2px 4px rgba(16, 40, 20, 0.08), 0px 8px 24px rgba(16, 40, 20, 0.10)" },
+} as const
+
+/** The faint edge cards keep so they still read on white. */
+export const hairline = "#E9EEEA"

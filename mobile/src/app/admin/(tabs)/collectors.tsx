@@ -6,7 +6,7 @@ import { confirmAction } from "../../../lib/dialogs"
 import type { Collector } from "../../../lib/types"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
-import { colors, font, radius, spacing } from "../../../theme"
+import { colors, font, hairline, radius, shadow, spacing } from "../../../theme"
 
 export default function AdminCollectors() {
   const { data, error, refreshing, refresh } = useFocusData(() => api.admin.collectors())
@@ -43,10 +43,11 @@ export default function AdminCollectors() {
             backgroundColor: colors.surface,
             borderRadius: radius.lg,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: hairline,
             padding: spacing.lg,
             gap: spacing.xs,
-            opacity: pressed ? 0.85 : c.active ? 1 : 0.7,
+            ...shadow.card,
+            opacity: pressed ? 0.9 : c.active ? 1 : 0.7,
           })}
         >
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

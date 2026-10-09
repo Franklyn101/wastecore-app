@@ -1,7 +1,7 @@
 import { router } from "expo-router"
 import { useState } from "react"
 import { Pressable, Switch, Text, View } from "react-native"
-import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, Section } from "../../components/ui"
+import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, Section, switchColors } from "../../components/ui"
 import { api } from "../../lib/api"
 import { confirmAction } from "../../lib/dialogs"
 import { TimeWindowPicker } from "../../components/TimeWindowPicker"
@@ -124,6 +124,7 @@ export default function MyPlan() {
               </Text>
             </View>
             <Switch
+              {...switchColors}
               accessibilityLabel="Automatic renewal"
               value={plan.autoRenew}
               disabled={!plan.hasSavedCard || toggle.busy}

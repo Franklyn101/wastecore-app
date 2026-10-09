@@ -44,10 +44,9 @@ export function AppLoader({ ready, minMs = 1200 }: { ready: boolean; minMs?: num
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] })
   return (
     <Animated.View
-      style={[StyleSheet.absoluteFill, styles.screen, { opacity }]}
+      style={[StyleSheet.absoluteFill, styles.screen, { opacity, pointerEvents: ready && minDone ? "none" : "auto" }]}
       accessibilityRole="progressbar"
       accessibilityLabel="Loading WasteCore"
-      pointerEvents={ready && minDone ? "none" : "auto"}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
         <BrandLogo width={LOGO_WIDTH} />

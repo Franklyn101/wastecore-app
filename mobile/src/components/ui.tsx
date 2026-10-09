@@ -11,7 +11,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from "react-native"
-import { colors, font, radius, spacing } from "../theme"
+import { colors, font, hairline, radius, shadow, spacing } from "../theme"
 
 export function Screen({
   children,
@@ -149,6 +149,13 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
   )
 }
 
+/** White knob on every switch (the web otherwise draws a teal one when on). Spread onto <Switch>. */
+export const switchColors = {
+  thumbColor: "#FFFFFF",
+  // react-native-web only:
+  activeThumbColor: "#FFFFFF",
+} as object
+
 export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   return <View style={[styles.card, style]}>{children}</View>
 }
@@ -251,10 +258,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: hairline,
     backgroundColor: colors.surface,
+    ...shadow.card,
   },
   optionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   radio: {
@@ -283,8 +291,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     gap: spacing.md,
+    // A faint edge plus a soft shadow; screens can still set borderColor to highlight a card.
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: hairline,
+    ...shadow.card,
   },
   badge: { alignSelf: "flex-start", paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill },
   badgeText: { fontSize: 12, fontWeight: "700" },

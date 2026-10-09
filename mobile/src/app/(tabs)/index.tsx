@@ -9,7 +9,7 @@ import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
 import { formatDate, hourLabel, isActive, naira } from "../../lib/format"
 import { useFocusData } from "../../lib/useFocusData"
-import { colors, font, radius, spacing } from "../../theme"
+import { colors, font, hairline, radius, shadow, spacing } from "../../theme"
 
 type Service = {
   title: string
@@ -175,14 +175,6 @@ export default function Home() {
   )
 }
 
-const shadow = {
-  shadowColor: "#0B2A12",
-  shadowOpacity: 0.06,
-  shadowRadius: 8,
-  shadowOffset: { width: 0, height: 2 },
-  elevation: 2,
-}
-
 const styles = StyleSheet.create({
   hero: {
     flexDirection: "row",
@@ -191,7 +183,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    ...shadow,
+    ...shadow.raised,
   },
   heroIcon: {
     width: 48,
@@ -213,7 +205,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     gap: 4,
-    ...shadow,
+    borderWidth: 1,
+    borderColor: hairline,
+    ...shadow.card,
   },
   tileTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.sm },
   tileIcon: {
@@ -232,7 +226,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: hairline,
+    ...shadow.card,
   },
   pressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
 })

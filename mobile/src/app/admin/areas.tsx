@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Switch, Text, View } from "react-native"
 import { MapView } from "../../components/MapView"
-import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField } from "../../components/ui"
+import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField, switchColors } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useIsOwner } from "../../lib/auth"
 import { confirmAction } from "../../lib/dialogs"
@@ -56,6 +56,7 @@ export default function AdminAreas() {
             </View>
             <Badge label={area.active ? "Live" : "Coming soon"} tone={area.active ? "success" : "warning"} />
             <Switch
+              {...switchColors}
               accessibilityLabel={`${area.name} taking bookings`}
               value={area.active}
               onValueChange={(v) => toggle(area, v)}
@@ -87,6 +88,7 @@ export default function AdminAreas() {
               <Text style={font.muted}>Paid orders go to the on-duty collector here with the fewest jobs that day.</Text>
             </View>
             <Switch
+              {...switchColors}
               accessibilityLabel={`${area.name} auto-assign`}
               value={area.autoAssign}
               onValueChange={(v) => save(area, { autoAssign: v })}

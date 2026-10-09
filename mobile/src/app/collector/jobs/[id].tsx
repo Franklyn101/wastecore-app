@@ -5,7 +5,7 @@ import { Alert, Image, Linking, Platform, StyleSheet, Switch, Text, View } from 
 import { jobLoad, JOB_KIND } from "../../../components/JobCard"
 import { MapView } from "../../../components/MapView"
 import { Stepper } from "../../../components/Stepper"
-import { Badge, Button, Card, Chip, ErrorBanner, Loading, Row, Screen, Section, TextField } from "../../../components/ui"
+import { Badge, Button, Card, Chip, ErrorBanner, Loading, Row, Screen, Section, TextField, switchColors } from "../../../components/ui"
 import type { PickedImage } from "../../../lib/api"
 import { useCatalog } from "../../../lib/catalog"
 import { confirmAction } from "../../../lib/dialogs"
@@ -170,7 +170,7 @@ export default function Job() {
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                 <Text style={[font.body, { flex: 1 }]}>Customer paid me {naira(extra)} in cash</Text>
-                <Switch accessibilityLabel="Customer paid the extra in cash" value={cash} onValueChange={setCash} trackColor={{ true: colors.primary }} />
+                <Switch {...switchColors} accessibilityLabel="Customer paid the extra in cash" value={cash} onValueChange={setCash} trackColor={{ true: colors.primary }} />
               </View>
               {!cash ? <Text style={font.muted}>The customer will be asked to pay in the app.</Text> : null}
             </View>

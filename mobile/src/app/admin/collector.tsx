@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import { Switch, Text, View } from "react-native"
 import { AreaChips } from "../../components/AreaChips"
-import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField } from "../../components/ui"
+import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, TextField, switchColors } from "../../components/ui"
 import { api } from "../../lib/api"
 import { useIsOwner } from "../../lib/auth"
 import { confirmAction } from "../../lib/dialogs"
@@ -75,6 +75,7 @@ export default function CollectorEditor() {
             <Text style={font.muted}>Inactive collectors can't be assigned new orders.</Text>
           </View>
           <Switch
+            {...switchColors}
             accessibilityLabel="Active"
             value={active}
             onValueChange={setActive}

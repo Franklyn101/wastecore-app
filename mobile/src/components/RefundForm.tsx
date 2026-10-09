@@ -6,7 +6,7 @@ import { formatDate, naira } from "../lib/format"
 import type { AdminOrder, Refund } from "../lib/types"
 import { useSubmit } from "../lib/useSubmit"
 import { colors, font, spacing } from "../theme"
-import { Button, Card, ErrorBanner, Row, Section, TextField } from "./ui"
+import { Button, Card, ErrorBanner, Row, Section, TextField, switchColors } from "./ui"
 
 /** Past refunds on an order, and a form to give money back. */
 export function RefundSection({ order, refunds, onRefunded }: { order: AdminOrder; refunds: Refund[]; onRefunded: () => void }) {
@@ -57,7 +57,7 @@ export function RefundSection({ order, refunds, onRefunded }: { order: AdminOrde
           {canCancel ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
               <Text style={[font.body, { flex: 1 }]}>Also cancel the order</Text>
-              <Switch accessibilityLabel="Also cancel the order" value={cancel} onValueChange={setCancel} trackColor={{ true: colors.danger }} />
+              <Switch {...switchColors} accessibilityLabel="Also cancel the order" value={cancel} onValueChange={setCancel} trackColor={{ true: colors.danger }} />
             </View>
           ) : null}
           {error ? <ErrorBanner message={error} /> : null}
