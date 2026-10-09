@@ -193,6 +193,8 @@ The quickest way to test the whole system on your computer. You only need [Docke
 docker compose up --build
 ```
 
+Run it from the project folder or from `backend/`; both start the same setup.
+
 The first build takes a few minutes. Then open:
 
 | What | Where |

@@ -1,0 +1,11 @@
+# Lets you start everything from this folder too:
+#
+#   docker compose up --build
+#
+# It's the same setup as ../docker-compose.yml (same containers and data); see that file
+# for the addresses to open.
+
+name: wastecore
+
+include:
+  - ../docker-compose.yml
