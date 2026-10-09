@@ -34,7 +34,7 @@ export default function SignIn() {
             <BrandLogo width={200} />
             <Text style={font.title}>Welcome</Text>
             <Text style={[font.muted, { textAlign: "center" }]}>
-              Book pickups, manage your plan and order waste bags. Collectors and staff sign in here too.
+              Book pickups, manage your plan and order waste bags.
             </Text>
           </View>
 
