@@ -7,7 +7,7 @@ import { Badge, Button, Card, ErrorBanner, Row, Screen, Section } from "../../co
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
-import { formatDate, isActive, naira } from "../../lib/format"
+import { formatDate, hourLabel, isActive, naira } from "../../lib/format"
 import { useFocusData } from "../../lib/useFocusData"
 import { colors, font, radius, spacing } from "../../theme"
 
@@ -16,6 +16,15 @@ type Service = {
   subtitle: string
   icon: ComponentProps<typeof Ionicons>["name"]
   href: Href
+  /** Icon colour and its tint, so each service is easy to tell apart. */
+  tone: { fg: string; bg: string }
+}
+
+const TONES = {
+  green: { fg: colors.primaryDark, bg: colors.primarySoft },
+  blue: { fg: colors.info, bg: colors.infoSoft },
+  amber: { fg: colors.warning, bg: colors.warningSoft },
+  slate: { fg: "#4B5563", bg: "#EEF1F4" },
 }
 
 export default function Home() {
@@ -36,43 +45,39 @@ export default function Home() {
   const cheapestPremium = premium.length ? Math.min(...premium.map((p) => p.price)) : null
   const cheapestBags = catalog ? Math.min(...catalog.bagSizes.map((b) => b.price)) : null
 
-  // The WhatsApp bot's five services, plus quotes for special waste.
+  // The WhatsApp bot's services, plus quotes for special waste. Instant pickup leads; support sits below.
+  const instant = {
+    title: "Instant pickup",
+    subtitle: catalog ? `One-time · ${naira(catalog.instantPickup.pricePerBag)}/bag` : "One-time pickup",
+  }
   const services: Service[] = [
-    {
-      title: "Instant pickup",
-      subtitle: catalog ? `One-time · ${naira(catalog.instantPickup.pricePerBag)}/bag` : "One-time pickup",
-      icon: "flash-outline",
-      href: "/book/pickup",
-    },
     {
       title: "Weekly plans",
       subtitle: cheapestWeekly ? `From ${naira(cheapestWeekly)}/week` : "Regular pickups",
       icon: "calendar-outline",
       href: plan ? "/plan" : "/book/plans",
+      tone: TONES.green,
     },
     {
       title: plan ? "Upgrade plan" : "Premium plans",
       subtitle: cheapestPremium ? `From ${naira(cheapestPremium)}/month` : "Monthly plans",
       icon: "star-outline",
       href: plan ? { pathname: "/book/plans", params: { change: plan.id, current: plan.plan } } : "/book/plans",
+      tone: TONES.amber,
     },
     {
       title: "Waste bags",
       subtitle: cheapestBags ? `From ${naira(cheapestBags)}/pack` : "Packs of 10",
       icon: "bag-handle-outline",
       href: "/book/bags",
+      tone: TONES.blue,
     },
     {
       title: "Special waste",
-      subtitle: "Rubble, furniture, e-waste: get a quote",
+      subtitle: "Rubble, furniture, electronics",
       icon: "construct-outline",
       href: "/quotes",
-    },
-    {
-      title: "Support",
-      subtitle: "Report an issue",
-      icon: "help-buoy-outline",
-      href: "/support/new",
+      tone: TONES.slate,
     },
   ]
 
@@ -109,6 +114,25 @@ export default function Home() {
       ) : null}
 
       <Section title="Services">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${instant.title}, ${instant.subtitle}`}
+          onPress={() => router.push("/book/pickup")}
+          style={({ pressed }) => [styles.hero, pressed && styles.pressed]}
+        >
+          <View style={styles.heroIcon}>
+            <Ionicons name="flash" size={26} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.heroTitle}>{instant.title}</Text>
+            <Text style={styles.heroSubtitle}>{instant.subtitle}</Text>
+            {catalog ? (
+              <Text style={styles.heroNote}>Same day if booked before {hourLabel(catalog.instantPickup.asapCutoffHour)}</Text>
+            ) : null}
+          </View>
+          <Ionicons name="arrow-forward-circle" size={32} color="#FFFFFF" />
+        </Pressable>
+
         <View style={styles.grid}>
           {services.map((s) => (
             <Pressable
@@ -116,40 +140,99 @@ export default function Home() {
               accessibilityRole="button"
               accessibilityLabel={`${s.title}, ${s.subtitle}`}
               onPress={() => router.push(s.href)}
-              style={({ pressed }) => [styles.tile, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
             >
-              <View style={styles.tileIcon}>
-                <Ionicons name={s.icon} size={24} color={colors.primary} />
+              <View style={styles.tileTop}>
+                <View style={[styles.tileIcon, { backgroundColor: s.tone.bg }]}>
+                  <Ionicons name={s.icon} size={22} color={s.tone.fg} />
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
               </View>
-              <Text style={font.label}>{s.title}</Text>
-              <Text style={font.muted}>{s.subtitle}</Text>
+              <Text style={font.label} numberOfLines={1}>
+                {s.title}
+              </Text>
+              <Text style={font.muted} numberOfLines={2}>
+                {s.subtitle}
+              </Text>
             </Pressable>
           ))}
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Need help? Contact support"
+          onPress={() => router.push("/support/new")}
+          style={({ pressed }) => [styles.helpRow, pressed && styles.pressed]}
+        >
+          <Ionicons name="help-buoy-outline" size={20} color={colors.primaryDark} />
+          <Text style={[font.body, { flex: 1 }]}>
+            Need help? <Text style={{ color: colors.primaryDark, fontWeight: "700" }}>Contact support</Text>
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
       </Section>
     </Screen>
   )
 }
 
+const shadow = {
+  shadowColor: "#0B2A12",
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
+}
+
 const styles = StyleSheet.create({
+  hero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    ...shadow,
+  },
+  heroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroTitle: { fontSize: 18, fontWeight: "800", color: "#FFFFFF" },
+  heroSubtitle: { fontSize: 14, fontWeight: "600", color: "#FFFFFF" },
+  heroNote: { fontSize: 13, color: "#FFFFFF", opacity: 0.95 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   tile: {
     flexGrow: 1,
     flexBasis: "45%",
+    minHeight: 132,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.lg,
-    gap: spacing.xs,
+    gap: 4,
+    ...shadow,
   },
+  tileTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.sm },
   tileIcon: {
     width: 44,
     height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: spacing.sm,
   },
+  helpRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
 })
