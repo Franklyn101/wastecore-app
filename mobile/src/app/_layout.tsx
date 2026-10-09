@@ -2,7 +2,7 @@ import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { View } from "react-native"
 import { AppTabBar, TabBarProvider } from "../components/AppTabBar"
-import { Loading } from "../components/ui"
+import { AppLoader } from "../components/AppLoader"
 import { AuthProvider, useAuth } from "../lib/auth"
 import { CatalogProvider } from "../lib/catalog"
 import { NotificationsProvider } from "../lib/notifications"
@@ -10,7 +10,8 @@ import { colors } from "../theme"
 
 function RootNavigator() {
   const { user, loading } = useAuth()
-  if (loading) return <Loading />
+  // The launch loader covers the screen until the saved sign-in has been checked.
+  if (loading) return null
 
   // Customers, staff and collectors use the same app; the screens they can reach depend on their role.
   // The server checks the role on every admin request, so this only shapes the UI.
@@ -88,6 +89,12 @@ function RootNavigator() {
   )
 }
 
+/** The logo screen shown when the app first opens. */
+function LaunchLoader() {
+  const { loading } = useAuth()
+  return <AppLoader ready={!loading} />
+}
+
 export default function RootLayout() {
   return (
     <AuthProvider>
@@ -95,7 +102,10 @@ export default function RootLayout() {
         <NotificationsProvider>
           <TabBarProvider>
             <StatusBar style="dark" />
-            <RootNavigator />
+            <View style={{ flex: 1, backgroundColor: colors.background }}>
+              <RootNavigator />
+              <LaunchLoader />
+            </View>
           </TabBarProvider>
         </NotificationsProvider>
       </CatalogProvider>

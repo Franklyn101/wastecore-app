@@ -35,7 +35,7 @@ createServer(async (req, res) => {
     <title>WasteCore test texts</title>
     <style>body{font-family:system-ui,sans-serif;max-width:640px;margin:24px auto;padding:0 16px;color:#14211a}
     li{list-style:none;border:1px solid #dce3df;border-radius:12px;padding:12px 16px;margin:10px 0}
-    .meta{color:#5e6b64;font-size:14px}.code{font-size:28px;font-weight:800;letter-spacing:4px;color:#167a3e}</style>
+    .meta{color:#5e6b64;font-size:14px}.code{font-size:28px;font-weight:800;letter-spacing:4px;color:#2e820b}</style>
     <h1>Test text messages</h1><p>SMS the API would have sent. Refreshes every 5 seconds.</p>
     <ul style="padding:0">${rows || "<p>No texts yet.</p>"}</ul>`)
 }).listen(port, () => console.log(`SMS inbox on http://localhost:${port}`))

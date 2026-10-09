@@ -1,7 +1,8 @@
 export const colors = {
-  primary: "#167A3E",
-  primaryDark: "#0F5A2D",
-  primarySoft: "#E8F5EC",
+  // The WasteCore logo green, with a darker shade for text on light green and a pale tint.
+  primary: "#2E820B",
+  primaryDark: "#236409",
+  primarySoft: "#EBF5E5",
   background: "#F6F8F7",
   surface: "#FFFFFF",
   text: "#14211A",

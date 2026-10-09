@@ -75,7 +75,8 @@ export function Button({
         <Text
           style={[
             styles.buttonText,
-            variant === "secondary" && { color: colors.primary },
+            // The darker green keeps text readable on the pale green button.
+            variant === "secondary" && { color: colors.primaryDark },
             variant === "danger" && { color: colors.danger },
           ]}
         >

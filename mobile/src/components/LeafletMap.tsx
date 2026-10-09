@@ -30,7 +30,7 @@ type Props = {
   dom?: DOMProps
 }
 
-const GREEN = "#167A3E"
+const GREEN = "#2E820B"
 
 const pinIcon = L.divIcon({
   className: "",
