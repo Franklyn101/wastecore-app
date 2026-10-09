@@ -50,6 +50,11 @@ import type {
 // computer's LAN address (e.g. http://192.168.1.20:4000), not localhost.
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "")
 
+// While developing, say which server we tried, so a wrong address in .env.local is easy to spot.
+const UNREACHABLE =
+  "Can't reach WasteCore. Check your internet connection and try again." +
+  (__DEV__ ? `\n\n(Dev: tried ${API_URL}. On a phone this must be your computer's Wi-Fi address, not localhost.)` : "")
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -80,7 +85,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${API_URL}${path}`, { ...init, headers: { ...headers, ...(init.headers as object) } })
   } catch {
-    throw new ApiError("Can't reach WasteCore. Check your internet connection and try again.", 0)
+    throw new ApiError(UNREACHABLE, 0)
   }
 
   const data = await res.json().catch(() => ({}))
@@ -97,7 +102,7 @@ async function requestText(path: string): Promise<string> {
   try {
     res = await fetch(`${API_URL}${path}`, { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} })
   } catch {
-    throw new ApiError("Can't reach WasteCore. Check your internet connection and try again.", 0)
+    throw new ApiError(UNREACHABLE, 0)
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
