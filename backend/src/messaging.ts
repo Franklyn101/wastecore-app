@@ -63,5 +63,23 @@ export function sendEmail(to: string, subject: string, text: string) {
     if (!config.isProduction) console.log(`[dev] Email to ${to}: ${subject} / ${text}`)
     return
   }
-  background(mailer().sendMail({ from: config.smtp.from, to, subject, text }))
+  background(mailer().sendMail({ from: config.smtp.from, to, subject, text, html: brandedHtml(text) }))
+}
+
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+
+/** The plain-text email, laid out under the WasteCore logo. Email apps that don't show HTML use the text. */
+function brandedHtml(text: string) {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((p) => `<p style="margin:0 0 16px">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
+    .join("")
+  return `<!doctype html><html><body style="margin:0;background:#F6F8F7;font-family:Arial,Helvetica,sans-serif;color:#14211A">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFFFF;border-radius:12px">
+<tr><td align="center" style="padding:28px 24px 8px"><img src="${config.publicUrl}/brand/wastecore-logo.png" width="160" alt="WasteCore" style="display:block;border:0"></td></tr>
+<tr><td style="padding:16px 28px 12px;font-size:15px;line-height:1.5">${paragraphs}</td></tr>
+</table>
+<p style="font-size:12px;color:#5E6B64;margin:16px 0 0">WasteCore · Yenagoa, Bayelsa</p>
+</td></tr></table></body></html>`
 }

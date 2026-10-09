@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="249 165 148 148" role="img" aria-label="WasteCore">
+<defs><clipPath id="wc-clip"><circle cx="322.9" cy="239" r="69.5"/></clipPath></defs>
+<g fill="none" stroke="#FFFFFF" stroke-width="9" clip-path="url(#wc-clip)">
+    <circle cx="322.9" cy="239" r="65.1" stroke-width="8.7"/>
+    <path d="M259.5 213 L288.5 288 L307 236.5 L350.9 270.6" stroke-linejoin="miter" stroke-miterlimit="6"/>
+    <path d="M392 212.5 H358 A29.5 29.5 0 0 0 358 271.5 H392"/>
+  </g>
+</svg>

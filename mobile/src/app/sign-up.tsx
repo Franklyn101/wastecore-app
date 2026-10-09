@@ -1,10 +1,11 @@
 import { useLocalSearchParams } from "expo-router"
 import { useState } from "react"
-import { KeyboardAvoidingView, Platform, Text } from "react-native"
+import { KeyboardAvoidingView, Platform, Text, View } from "react-native"
+import { BrandLogo } from "../components/BrandLogo"
 import { AreaChips } from "../components/AreaChips"
 import { Button, ErrorBanner, OptionCard, Screen, Section, TextField } from "../components/ui"
 import { useAuth } from "../lib/auth"
-import { font } from "../theme"
+import { font, spacing } from "../theme"
 
 type Kind = "customer" | "collector"
 
@@ -40,6 +41,9 @@ export default function SignUp() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <Screen>
+        <View style={{ alignItems: "center", marginVertical: spacing.sm }}>
+          <BrandLogo width={150} />
+        </View>
         <Section title="I want to">
           <OptionCard
             title="Get my waste picked up"

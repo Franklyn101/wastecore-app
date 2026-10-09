@@ -21,7 +21,9 @@
       "package": "com.wastecore.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "WasteCore",
+      "themeColor": "#FFFFFF"
     },
     "plugins": [
       "expo-router",
@@ -46,7 +48,16 @@
           "locationWhenInUsePermission": "WasteCore uses your location to pin your pickup address on the map and check that we serve your area."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ]
     ],
     "scheme": "wastecore"
   }

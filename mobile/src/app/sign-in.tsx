@@ -2,6 +2,7 @@ import { Link } from "expo-router"
 import { useState } from "react"
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { BrandLogo } from "../components/BrandLogo"
 import { Button, ErrorBanner, Screen, TextField } from "../components/ui"
 import { useAuth } from "../lib/auth"
 import { colors, font, spacing } from "../theme"
@@ -30,10 +31,8 @@ export default function SignIn() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <Screen>
           <View style={styles.hero}>
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>W</Text>
-            </View>
-            <Text style={font.title}>Welcome to WasteCore</Text>
+            <BrandLogo width={200} />
+            <Text style={font.title}>Welcome</Text>
             <Text style={[font.muted, { textAlign: "center" }]}>
               Book pickups, manage your plan and order waste bags. Collectors and staff sign in here too.
             </Text>
@@ -84,14 +83,4 @@ export default function SignIn() {
 
 const styles = StyleSheet.create({
   hero: { alignItems: "center", gap: spacing.sm, marginTop: spacing.xxl, marginBottom: spacing.lg },
-  logo: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.sm,
-  },
-  logoText: { color: "#fff", fontSize: 36, fontWeight: "800" },
 })

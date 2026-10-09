@@ -1,3 +1,5 @@
+<p align="center"><img src="mobile/assets/brand/wastecore-logo.svg" alt="WasteCore" width="260"></p>
+
 # WasteCore App
 
 A mobile app for WasteCore waste collection, built with **React Native + Expo** on a **Node.js + PostgreSQL** backend.
@@ -24,6 +26,10 @@ wastecore-app/
 | Typing `cancel` | Unpaid orders can be cancelled in the app. Paid ones go through support. |
 
 The app has a few things the bot doesn't: accounts with a phone number and password, saved addresses pinned on a map, an order history, a payment progress tracker, and order references (`WC-XXXXXX`) for the transfer narration.
+
+## Logo
+
+The logo files are in `mobile/assets/brand/`: the full logo and the round emblem as vectors (SVG, green and white), plus the original image. The app icon, Android icon, splash screen, web favicon and the logo on sign-in screens, screen headers and emails are made from them. If your designer has the original vector file, drop it in there and regenerate the PNGs in `mobile/assets/`.
 
 ## Service areas, addresses and maps
 

@@ -4,6 +4,7 @@ import type { ComponentProps } from "react"
 import { Text, View, type ColorValue } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useHideTabBar } from "../../../components/AppTabBar"
+import { BrandLogo, HeaderMark } from "../../../components/BrandLogo"
 import { NotificationsBell } from "../../../components/NotificationsBell"
 import { Button, Card, ErrorBanner, Loading, Screen } from "../../../components/ui"
 import { api } from "../../../lib/api"
@@ -32,7 +33,7 @@ export default function CollectorTabsLayout() {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <Screen refreshing={refreshing} onRefresh={refresh}>
           <View style={{ alignItems: "center", gap: spacing.sm, marginTop: spacing.xxl }}>
-            <Ionicons name="hourglass-outline" size={48} color={colors.primary} />
+            <BrandLogo width={150} />
             <Text style={font.title}>Waiting for approval</Text>
           </View>
           <Card>
@@ -61,6 +62,7 @@ export default function CollectorTabsLayout() {
         headerTitleStyle: { color: colors.text },
         sceneStyle: { backgroundColor: colors.background },
         headerRight: () => <NotificationsBell />,
+        headerLeft: () => <HeaderMark />,
       }}
     >
       <Tabs.Screen name="index" options={{ title: "My jobs", tabBarIcon: icon("navigate-outline") }} />

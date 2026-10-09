@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { Tabs } from "expo-router/js-tabs"
 import type { ComponentProps } from "react"
 import type { ColorValue } from "react-native"
+import { HeaderMark } from "../../../components/BrandLogo"
 import { NotificationsBell } from "../../../components/NotificationsBell"
 import { colors } from "../../../theme"
 
@@ -22,6 +23,7 @@ export default function AdminTabsLayout() {
         headerTitleStyle: { color: colors.text },
         sceneStyle: { backgroundColor: colors.background },
         headerRight: () => <NotificationsBell />,
+        headerLeft: () => <HeaderMark />,
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Orders", tabBarIcon: icon("file-tray-full-outline") }} />

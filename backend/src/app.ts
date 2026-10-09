@@ -1,3 +1,4 @@
+import path from "node:path"
 import cors from "cors"
 import express from "express"
 import helmet from "helmet"
@@ -33,6 +34,8 @@ export function createApp() {
     res.json({ status: "ok" })
   })
   app.use("/uploads", express.static(UPLOAD_DIR, { fallthrough: false, index: false }))
+  // The logo, for emails.
+  app.use("/brand", express.static(path.resolve("public/brand"), { fallthrough: false, index: false, maxAge: "7d" }))
 
   app.use(authRouter, passwordRouter, verifyRouter, areasRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, operationsRouter, staffRouter, quotesRouter, wasteRouter, collectorRouter, notificationsRouter)
 

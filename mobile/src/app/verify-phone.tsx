@@ -1,7 +1,7 @@
-import Ionicons from "@expo/vector-icons/Ionicons"
 import { useEffect, useState } from "react"
 import { KeyboardAvoidingView, Platform, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
+import { BrandLogo } from "../components/BrandLogo"
 import { Button, Card, ErrorBanner, Screen, TextField } from "../components/ui"
 import { api } from "../lib/api"
 import { useAuth } from "../lib/auth"
@@ -41,7 +41,7 @@ export default function VerifyPhone() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <Screen>
           <View style={{ alignItems: "center", gap: spacing.sm, marginTop: spacing.xl }}>
-            <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.primary} />
+            <BrandLogo width={150} />
             <Text style={font.title}>Verify your phone</Text>
             <Text style={[font.muted, { textAlign: "center" }]}>
               We texted a 6-digit code to {user?.phone}. Enter it to finish setting up your account.

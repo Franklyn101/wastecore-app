@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
-import { KeyboardAvoidingView, Platform, Text } from "react-native"
+import { KeyboardAvoidingView, Platform, Text, View } from "react-native"
+import { BrandLogo } from "../components/BrandLogo"
 import { Button, Card, ErrorBanner, Screen, TextField } from "../components/ui"
 import { api } from "../lib/api"
 import { useAuth } from "../lib/auth"
 import { useSubmit } from "../lib/useSubmit"
-import { colors, font } from "../theme"
+import { colors, font, spacing } from "../theme"
 
 // Forgot password: phone -> 6-digit code (SMS, plus email if the account has one) -> new password.
 export default function ForgotPassword() {
@@ -40,6 +41,9 @@ export default function ForgotPassword() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <Screen>
+        <View style={{ alignItems: "center", marginVertical: spacing.sm }}>
+          <BrandLogo width={150} />
+        </View>
         {!sentTo ? (
           <>
             <Text style={font.muted}>Enter the phone number you sign in with. We'll text you a 6-digit code.</Text>
