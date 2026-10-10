@@ -1,3 +1,4 @@
+import Constants from "expo-constants"
 import { Platform } from "react-native"
 import type {
   AdminOrder,
@@ -46,9 +47,18 @@ import type {
   WasteReport,
 } from "./types"
 
-// Set EXPO_PUBLIC_API_URL in mobile/.env. On a physical phone use your
-// computer's LAN address (e.g. http://192.168.1.20:4000), not localhost.
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "")
+// Set EXPO_PUBLIC_API_URL in mobile/.env for a real server. While developing on a phone
+// (Expo Go), "localhost" is the phone itself, so we use the computer Expo is running on instead.
+export const API_URL = resolveApiUrl().replace(/\/$/, "")
+
+function resolveApiUrl() {
+  const configured = process.env.EXPO_PUBLIC_API_URL
+  if (!__DEV__ || Platform.OS === "web") return configured ?? "http://localhost:4000"
+  if (configured && !/\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(configured)) return configured
+  // e.g. "192.168.1.20:8082": the computer's Wi-Fi address, as the phone sees it.
+  const devHost = Constants.expoConfig?.hostUri?.split(":")[0]
+  return devHost && /^\d+\.\d+\.\d+\.\d+$/.test(devHost) ? `http://${devHost}:4000` : (configured ?? "http://localhost:4000")
+}
 
 // While developing, say which server we tried, so a wrong address in .env.local is easy to spot.
 const UNREACHABLE =
