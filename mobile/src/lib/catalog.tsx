@@ -15,7 +15,11 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     setError(null)
     api
       .catalog()
-      .then(setCatalog)
+      .then((c) => {
+        // An older server doesn't send the pickup prices; say so rather than crash.
+        if (!c.pickupPricing) throw new Error("The WasteCore server is out of date. Restart it with: docker compose up --build")
+        setCatalog(c)
+      })
       .catch((e: Error) => setError(e.message))
   }, [])
 
