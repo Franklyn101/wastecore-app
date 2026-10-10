@@ -50,6 +50,7 @@ function RootNavigator() {
           <Stack.Screen name="support/new" options={{ title: "Contact support" }} />
           <Stack.Screen name="addresses/index" options={{ title: "My addresses" }} />
           <Stack.Screen name="payments" options={{ title: "Payment history" }} />
+          <Stack.Screen name="prices" options={{ title: "Prices and how to pay" }} />
           <Stack.Screen name="quotes/index" options={{ title: "Special waste" }} />
           <Stack.Screen name="quotes/new" options={{ title: "Ask for a quote" }} />
           <Stack.Screen name="quotes/[id]" options={{ title: "Quote" }} />

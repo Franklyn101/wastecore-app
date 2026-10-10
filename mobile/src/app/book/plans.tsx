@@ -78,12 +78,12 @@ export default function ChoosePlan() {
       <Stack.Screen options={{ title: change ? "Change plan" : "Choose a plan" }} />
       {group(
         "Weekly plans",
-        "Regular pickups, paid every 4 weeks.",
+        "Pickups on set days every week, paid every 4 weeks. Cheaper than booking each time.",
         catalog.plans.filter((p) => p.group === "weekly"),
       )}
       {group(
-        "Premium plans",
-        "More pickups and waste bags included, paid monthly.",
+        "Monthly plans",
+        "Bigger pickups (more bags each time) and priority support, paid monthly.",
         catalog.plans.filter((p) => p.group === "premium"),
       )}
 

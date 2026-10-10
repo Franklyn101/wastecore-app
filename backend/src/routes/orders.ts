@@ -128,9 +128,13 @@ ordersRouter.post("/orders", async (req, res) => {
 })
 
 ordersRouter.get("/orders", async (req, res) => {
-  // Plan pickups are listed under the plan (GET /subscriptions/:id), not here.
+  // Plan pickups are listed under the plan (GET /subscriptions/:id), not here,
+  // unless there's something to pay on one (extra bags or a wasted trip).
   const orders = await prisma.order.findMany({
-    where: { userId: currentUser(req).id, type: { not: "PLAN_PICKUP" } },
+    where: {
+      userId: currentUser(req).id,
+      OR: [{ type: { not: "PLAN_PICKUP" } }, { extraAmount: { gt: 0 }, extraPaidAt: null }],
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   })

@@ -127,7 +127,7 @@ describe("instant pickups, WasteCore bags and wasted trips", () => {
   })
 
   it("charges plan pickups only for bags over the plan's limit", async () => {
-    const { collector, collectorId } = await setup(0)
+    const { customer, collector, collectorId } = await setup(0)
     const { id: userId } = await prisma.user.findFirstOrThrow({ where: { phone: "+2348012345678" } })
     const order = await prisma.order.create({
       data: {
@@ -145,6 +145,9 @@ describe("instant pickups, WasteCore bags and wasted trips", () => {
     })
     const done = await request(app).post(`/collector/jobs/${order.id}/complete`).set(collector).field("bags", "5")
     expect(done.body.job).toMatchObject({ extraAmount: 2 * 500, pay: 250 + 5 * 300 })
+    // Plan pickups aren't in the order list, except when there's something to pay.
+    const listed = (await request(app).get("/orders").set(customer)).body.orders
+    expect(listed.map((o: { id: string }) => o.id)).toEqual([order.id])
   })
 })
 

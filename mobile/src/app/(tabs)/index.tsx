@@ -7,13 +7,16 @@ import { Badge, Button, Card, ErrorBanner, Row, Screen, Section } from "../../co
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
 import { useCatalog } from "../../lib/catalog"
-import { formatDate, hourLabel, isActive, naira } from "../../lib/format"
+import { daysUntil, formatDate, hourLabel, isActive, naira, orderTitle } from "../../lib/format"
+import type { Order, Subscription } from "../../lib/types"
 import { useFocusData } from "../../lib/useFocusData"
 import { colors, font, hairline, radius, shadow, spacing } from "../../theme"
 
 type Service = {
   title: string
   subtitle: string
+  /** e.g. "From ₦1,500/week". */
+  price?: string
   icon: ComponentProps<typeof Ionicons>["name"]
   href: Href
   /** Icon colour and its tint, so each service is easy to tell apart. */
@@ -31,43 +34,47 @@ export default function Home() {
   const { user } = useAuth()
   const { catalog, error: catalogError, reload } = useCatalog()
   const { data, error, refreshing, refresh } = useFocusData(async () => {
-    const [{ orders }, { subscriptions }] = await Promise.all([api.orders(), api.subscriptions()])
+    const [{ orders }, { subscriptions, renewWindowDays }] = await Promise.all([api.orders(), api.subscriptions()])
     const plan = subscriptions.find((s) => s.status === "ACTIVE") ?? null
     const nextPickup = plan ? ((await api.subscription(plan.id)).upcomingPickups[0] ?? null) : null
-    return { orders, plan, nextPickup }
+    return { orders, subscriptions, renewWindowDays, plan, nextPickup }
   })
-  const active = data?.orders.filter((o) => isActive(o.status)) ?? []
   const plan = data?.plan ?? null
+  const toPay = data ? amountsDue(data.orders, data.subscriptions, data.renewWindowDays) : []
+  // Unpaid bookings are under "To pay", so they're not listed twice.
+  const active = data?.orders.filter((o) => isActive(o.status) && o.status !== "AWAITING_PAYMENT") ?? []
 
   const weekly = catalog?.plans.filter((p) => p.group === "weekly") ?? []
   const premium = catalog?.plans.filter((p) => p.group === "premium") ?? []
   const cheapestWeekly = weekly.length ? Math.min(...weekly.map((p) => p.price / 4)) : null
-  const cheapestPremium = premium.length ? Math.min(...premium.map((p) => p.price)) : null
+  const cheapestMonthly = premium.length ? Math.min(...premium.map((p) => p.price)) : null
   const cheapestBags = catalog ? Math.min(...catalog.bagSizes.map((b) => b.price)) : null
+  const weeklyBags = weekly[0]?.bagsPerPickup
+  const monthlyBags = premium[0]?.bagsPerPickup
+  const pricing = catalog?.pickupPricing
 
-  // The WhatsApp bot's services, plus quotes for special waste. Instant pickup leads; support sits below.
-  const instant = {
-    title: "Instant pickup",
-    subtitle: catalog ? `One-time · from ${naira(catalog.pickupPricing.scheduled.firstBags)}/bag` : "One-time pickup",
-  }
+  // One-time pickups lead; then regular plans, bags and special waste.
   const services: Service[] = [
     {
-      title: "Weekly plans",
-      subtitle: cheapestWeekly ? `From ${naira(cheapestWeekly)}/week` : "Regular pickups",
+      title: plan ? "My plan" : "Weekly plans",
+      subtitle: plan ? `${plan.planName}. Manage or upgrade` : `Every week${weeklyBags ? `, up to ${weeklyBags} bags` : ""}`,
+      price: !plan && cheapestWeekly ? `From ${naira(cheapestWeekly)}/week` : undefined,
       icon: "calendar-outline",
       href: plan ? "/plan" : "/book/plans",
       tone: TONES.green,
     },
     {
-      title: plan ? "Upgrade plan" : "Premium plans",
-      subtitle: cheapestPremium ? `From ${naira(cheapestPremium)}/month` : "Monthly plans",
+      title: "Monthly plans",
+      subtitle: `Bigger pickups${monthlyBags ? `, up to ${monthlyBags} bags` : ""}`,
+      price: cheapestMonthly ? `From ${naira(cheapestMonthly)}/month` : undefined,
       icon: "star-outline",
       href: plan ? { pathname: "/book/plans", params: { change: plan.id, current: plan.plan } } : "/book/plans",
       tone: TONES.amber,
     },
     {
-      title: "Waste bags",
-      subtitle: cheapestBags ? `From ${naira(cheapestBags)}/pack` : "Packs of 10",
+      title: "Buy bag packs",
+      subtitle: "Packs of 10, delivered",
+      price: cheapestBags ? `From ${naira(cheapestBags)}/pack` : undefined,
       icon: "bag-handle-outline",
       href: "/book/bags",
       tone: TONES.blue,
@@ -75,6 +82,7 @@ export default function Home() {
     {
       title: "Special waste",
       subtitle: "Rubble, furniture, electronics",
+      price: "We send you a price",
       icon: "construct-outline",
       href: "/quotes",
       tone: TONES.slate,
@@ -90,6 +98,30 @@ export default function Home() {
 
       {catalogError ? <ErrorBanner message={catalogError} onRetry={reload} /> : null}
       {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
+
+      {toPay.length ? (
+        <Section title="To pay">
+          {toPay.map((item) => (
+            <Pressable
+              key={item.key}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}, ${naira(item.amount)}. ${item.action}`}
+              onPress={() => router.push(item.href)}
+              style={({ pressed }) => [styles.dueRow, pressed && styles.pressed]}
+            >
+              <Ionicons name="wallet-outline" size={22} color={colors.warning} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={font.label}>{item.title}</Text>
+                <Text style={font.muted}>{item.note}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end", gap: 2 }}>
+                <Text style={styles.dueAmount}>{naira(item.amount)}</Text>
+                <Text style={styles.dueAction}>{item.action} ›</Text>
+              </View>
+            </Pressable>
+          ))}
+        </Section>
+      ) : null}
 
       {plan ? (
         <Card>
@@ -116,21 +148,34 @@ export default function Home() {
       <Section title="Services">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${instant.title}, ${instant.subtitle}`}
+          accessibilityLabel="Book a one-time pickup"
           onPress={() => router.push("/book/pickup")}
           style={({ pressed }) => [styles.hero, pressed && styles.pressed]}
         >
-          <View style={styles.heroIcon}>
-            <Ionicons name="flash" size={26} color={colors.primary} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+            <View style={styles.heroIcon}>
+              <Ionicons name="trash-bin" size={24} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.heroTitle}>Book a pickup</Text>
+              <Text style={styles.heroSubtitle}>One-time. Pay per bag.</Text>
+            </View>
+            <Ionicons name="arrow-forward-circle" size={32} color="#FFFFFF" />
           </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.heroTitle}>{instant.title}</Text>
-            <Text style={styles.heroSubtitle}>{instant.subtitle}</Text>
-            {catalog ? (
-              <Text style={styles.heroNote}>Same day if booked before {hourLabel(catalog.instantPickup.asapCutoffHour)}</Text>
-            ) : null}
-          </View>
-          <Ionicons name="arrow-forward-circle" size={32} color="#FFFFFF" />
+          {pricing && catalog ? (
+            <View style={styles.speeds}>
+              <View style={styles.speed}>
+                <Text style={styles.speedTitle}>Pick a date</Text>
+                <Text style={styles.speedPrice}>{naira(pricing.scheduled.firstBags)}/bag</Text>
+                <Text style={styles.speedNote}>Cheaper</Text>
+              </View>
+              <View style={styles.speed}>
+                <Text style={styles.speedTitle}>As soon as possible</Text>
+                <Text style={styles.speedPrice}>{naira(pricing.instant.firstBags)}/bag</Text>
+                <Text style={styles.speedNote}>Same day before {hourLabel(catalog.instantPickup.asapCutoffHour)}</Text>
+              </View>
+            </View>
+          ) : null}
         </Pressable>
 
         <View style={styles.grid}>
@@ -138,7 +183,7 @@ export default function Home() {
             <Pressable
               key={s.title}
               accessibilityRole="button"
-              accessibilityLabel={`${s.title}, ${s.subtitle}`}
+              accessibilityLabel={`${s.title}, ${s.subtitle}${s.price ? `, ${s.price}` : ""}`}
               onPress={() => router.push(s.href)}
               style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
             >
@@ -154,9 +199,27 @@ export default function Home() {
               <Text style={font.muted} numberOfLines={2}>
                 {s.subtitle}
               </Text>
+              {s.price ? (
+                <Text style={styles.tilePrice} numberOfLines={1}>
+                  {s.price}
+                </Text>
+              ) : null}
             </Pressable>
           ))}
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="All prices and how to pay"
+          onPress={() => router.push("/prices")}
+          style={({ pressed }) => [styles.helpRow, pressed && styles.pressed]}
+        >
+          <Ionicons name="pricetags-outline" size={20} color={colors.primaryDark} />
+          <Text style={[font.body, { flex: 1 }]}>
+            <Text style={{ color: colors.primaryDark, fontWeight: "700" }}>All prices and how to pay</Text>
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
@@ -175,11 +238,75 @@ export default function Home() {
   )
 }
 
+type Due = { key: string; title: string; note: string; amount: number; action: string; href: Href }
+
+/** Everything the customer owes: unpaid bookings, charges after a pickup, and plans to pay for or renew. */
+function amountsDue(orders: Order[], subscriptions: Subscription[], renewWindowDays: number): Due[] {
+  const due: Due[] = []
+  for (const o of orders) {
+    if (o.status === "AWAITING_PAYMENT") {
+      due.push({
+        key: o.id,
+        title: orderTitle(o),
+        note: o.receiptUrl ? `${o.reference} · check your receipt` : `${o.reference} · not booked until paid`,
+        amount: o.amount,
+        action: "Pay now",
+        href: `/orders/${o.id}`,
+      })
+    } else if (o.extraAmount > 0 && !o.extraPaidAt) {
+      due.push({
+        key: `${o.id}-extra`,
+        title: o.wastedTrip ? "Wasted-trip fee" : "Extra bags",
+        note: o.wastedTrip ? `${o.reference} · nothing to collect` : `${o.reference} · ${o.bagsCollected} bags collected`,
+        amount: o.extraAmount,
+        action: "Pay",
+        href: `/orders/${o.id}`,
+      })
+    }
+  }
+  for (const s of subscriptions) {
+    if (s.status === "PENDING_PAYMENT") {
+      due.push({
+        key: s.id,
+        title: s.planName,
+        note: "Your plan starts once it's paid",
+        amount: Math.max(0, s.price - s.credit),
+        action: "Pay now",
+        href: { pathname: "/plan/checkout", params: { id: s.id } },
+      })
+    } else if (s.status === "ACTIVE" && !s.autoRenew && s.currentPeriodEnd && daysUntil(s.currentPeriodEnd) <= renewWindowDays) {
+      due.push({
+        key: `${s.id}-renew`,
+        title: `Renew ${s.planName}`,
+        note: `Ends ${formatDate(s.currentPeriodEnd)}`,
+        amount: s.price,
+        action: "Renew",
+        href: { pathname: "/plan/checkout", params: { id: s.id } },
+      })
+    }
+  }
+  return due
+}
+
 const styles = StyleSheet.create({
-  hero: {
+  dueRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    backgroundColor: colors.warningSoft,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  dueAmount: { fontSize: 17, fontWeight: "800", color: colors.text },
+  dueAction: { fontSize: 13, fontWeight: "700", color: colors.warning },
+  speeds: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
+  speed: { flex: 1, backgroundColor: "rgba(255,255,255,0.16)", borderRadius: radius.md, padding: spacing.md, gap: 2 },
+  speedTitle: { fontSize: 13, fontWeight: "600", color: "#FFFFFF" },
+  speedPrice: { fontSize: 18, fontWeight: "800", color: "#FFFFFF" },
+  speedNote: { fontSize: 12, color: "#FFFFFF", opacity: 0.95 },
+  hero: {
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
     padding: spacing.lg,
@@ -195,7 +322,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: { fontSize: 18, fontWeight: "800", color: "#FFFFFF" },
   heroSubtitle: { fontSize: 14, fontWeight: "600", color: "#FFFFFF" },
-  heroNote: { fontSize: 13, color: "#FFFFFF", opacity: 0.95 },
+  tilePrice: { fontSize: 14, fontWeight: "700", color: colors.primaryDark, marginTop: 2 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   tile: {
     flexGrow: 1,
