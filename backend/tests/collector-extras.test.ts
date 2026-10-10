@@ -95,7 +95,7 @@ describe("instant pickups, WasteCore bags and wasted trips", () => {
     await request(app).patch(`/admin/orders/${o.body.order.id}`).set(staff).send({ collectorId })
 
     const job = (await request(app).get(`/collector/jobs/${o.body.order.id}`).set(collector)).body.job
-    expect(job).toMatchObject({ wastecoreBags: 2, quantity: 3 })
+    expect(job).toMatchObject({ wastecoreBags: 2, quantity: 3, estimatedPay: 400 + 3 * 450 + 2 * 50 })
     expect(job.amount).toBeUndefined() // collectors don't see prices
     const done = await request(app).post(`/collector/jobs/${o.body.order.id}/complete`).set(collector).field("bags", "5")
     // Instant: ₦400 a stop + ₦450 a bag + ₦50 per WasteCore bag. 5 bags cost ₦4,400 instead of ₦3,000.

@@ -1,5 +1,5 @@
 import { findPlan, planLabel } from "./catalog.ts"
-import { isInstant } from "./earnings.ts"
+import { isInstant, payFor } from "./earnings.ts"
 import type { Collector, Order, Subscription, SupportTicket } from "./generated/prisma/client.ts"
 
 const dateOnly = (date: Date) => date.toISOString().slice(0, 10)
@@ -113,6 +113,8 @@ export function collectorJob(order: Order & { user: { name: string; phone: strin
     extraAmount: order.extraAmount,
     extraPaid: Boolean(order.extraPaidAt),
     pay: order.collectorPay,
+    // What an open job pays for the bags booked (more bags pay more); fixed once it's closed.
+    estimatedPay: order.collectorPay ?? payFor(order, null),
   }
 }
 

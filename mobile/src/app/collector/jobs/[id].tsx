@@ -2,7 +2,7 @@ import * as ImagePicker from "expo-image-picker"
 import { router, useLocalSearchParams } from "expo-router"
 import { useState } from "react"
 import { Alert, Image, Linking, Platform, StyleSheet, Switch, Text, View } from "react-native"
-import { jobLoad, JOB_KIND } from "../../../components/JobCard"
+import { jobKind, jobTask } from "../../../components/JobCard"
 import { MapView } from "../../../components/MapView"
 import { Stepper } from "../../../components/Stepper"
 import { Badge, Button, Card, Chip, ErrorBanner, Loading, Row, Screen, Section, TextField, switchColors } from "../../../components/ui"
@@ -90,50 +90,28 @@ export default function Job() {
       ) : null}
       <Card>
         <View style={styles.headerRow}>
-          <Text style={font.heading}>{JOB_KIND[job.type]}</Text>
+          <Text style={font.heading}>{jobKind(job)}</Text>
           <View style={{ flexDirection: "row", gap: spacing.xs }}>
             {job.asap && open ? <Badge label="ASAP" tone="warning" /> : null}
             {job.onTheWayAt && open ? <Badge label="On the way" tone="success" /> : null}
           </View>
         </View>
         <Row label="When" value={job.asap ? `As soon as possible · ${formatDate(job.scheduledDate)}` : pickupWhen(job)} />
-        <Row label={job.type === "WASTE_BAGS" ? "Deliver" : "Collect"} value={jobLoad(job) || "—"} />
+        <Row label="What to do" value={jobTask(job)} />
+        {open ? <Row label="Pays" value={`About ${naira(job.estimatedPay)}${isPickup && job.type !== "SPECIAL_PICKUP" ? ", more for extra bags" : ""}`} /> : null}
         <Row label="Reference" value={job.reference} />
       </Card>
 
-      {job.notes ? (
+      {open && job.wastecoreBags ? (
         <Card style={{ backgroundColor: colors.warningSoft, borderColor: colors.warning }}>
-          <Text style={font.label}>Note from the office</Text>
-          <Text style={font.body}>{job.notes}</Text>
+          <Text style={font.label}>
+            Bring {job.wastecoreBags} WasteCore bag{job.wastecoreBags === 1 ? "" : "s"}
+          </Text>
+          <Text style={font.muted}>The customer has paid for them. Hand them over at the pickup.</Text>
         </Card>
       ) : null}
 
-      <Section title="Where">
-        <Card>
-          {job.lat != null && job.lng != null ? (
-            <MapView center={{ lat: job.lat, lng: job.lng }} pin={{ lat: job.lat, lng: job.lng }} height={200} zoom={17} />
-          ) : null}
-          <Text style={font.body}>{job.address}</Text>
-          {job.landmark ? <Text style={font.muted}>Landmark: {job.landmark}</Text> : null}
-          <Button title="Directions" variant="secondary" onPress={() => void Linking.openURL(directionsUrl(job))} />
-        </Card>
-      </Section>
-
-      <Section title="Customer">
-        <Card>
-          <Row label="Name" value={job.customer.name} />
-          <Row label="Phone" value={job.customer.phone} />
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
-            <Button title="Call" variant="secondary" style={{ flex: 1 }} onPress={() => void Linking.openURL(`tel:${job.customer.phone}`)} />
-            <Button
-              title="WhatsApp"
-              variant="secondary"
-              style={{ flex: 1 }}
-              onPress={() => void Linking.openURL(whatsappUrl(job.customer.phone))}
-            />
-          </View>
-        </Card>
-      </Section>
+      {open && mode === "idle" ? <Steps job={job} /> : null}
 
       {action.error ? <ErrorBanner message={action.error} /> : null}
 
@@ -264,6 +242,41 @@ export default function Job() {
         </Card>
       ) : null}
 
+
+      {job.notes ? (
+        <Card style={{ backgroundColor: colors.warningSoft, borderColor: colors.warning }}>
+          <Text style={font.label}>Note from the office</Text>
+          <Text style={font.body}>{job.notes}</Text>
+        </Card>
+      ) : null}
+
+      <Section title="Where">
+        <Card>
+          {job.lat != null && job.lng != null ? (
+            <MapView center={{ lat: job.lat, lng: job.lng }} pin={{ lat: job.lat, lng: job.lng }} height={200} zoom={17} />
+          ) : null}
+          <Text style={font.body}>{job.address}</Text>
+          {job.landmark ? <Text style={font.muted}>Landmark: {job.landmark}</Text> : null}
+          <Button title="Directions" variant="secondary" onPress={() => void Linking.openURL(directionsUrl(job))} />
+        </Card>
+      </Section>
+
+      <Section title="Customer">
+        <Card>
+          <Row label="Name" value={job.customer.name} />
+          <Row label="Phone" value={job.customer.phone} />
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Button title="Call" variant="secondary" style={{ flex: 1 }} onPress={() => void Linking.openURL(`tel:${job.customer.phone}`)} />
+            <Button
+              title="WhatsApp"
+              variant="secondary"
+              style={{ flex: 1 }}
+              onPress={() => void Linking.openURL(whatsappUrl(job.customer.phone))}
+            />
+          </View>
+        </Card>
+      </Section>
+
       {!open ? (
         <Card>
           <Text style={font.heading}>
@@ -295,6 +308,43 @@ export default function Job() {
         </Card>
       ) : null}
     </Screen>
+  )
+}
+
+/** The three steps of a job, with the done ones ticked. */
+function Steps({ job }: { job: { type: string; onTheWayAt: string | null } }) {
+  const delivery = job.type === "WASTE_BAGS"
+  const steps = [
+    { text: "Tap \"I'm on my way\" when you set off. The customer gets a message.", done: Boolean(job.onTheWayAt) },
+    { text: delivery ? "Hand over the bags." : "Collect the waste and count the bags.", done: false },
+    { text: delivery ? "Tap \"Mark delivered\"." : "Tap \"Mark completed\", enter the bags and take a photo.", done: false },
+  ]
+  return (
+    <Card style={{ gap: spacing.sm }}>
+      <Text style={font.label}>How to do this job</Text>
+      {steps.map((step, i) => (
+        <View key={i} style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" }}>
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: step.done ? colors.primary : colors.primarySoft,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "700", color: step.done ? "#FFFFFF" : colors.primaryDark }}>{step.done ? "✓" : i + 1}</Text>
+          </View>
+          <Text style={[font.body, { flex: 1 }, step.done && { color: colors.textMuted, textDecorationLine: "line-through" }]}>{step.text}</Text>
+        </View>
+      ))}
+      {!delivery ? (
+        <Text style={font.muted}>
+          Nobody home or no waste out? Tap "Couldn't complete" and turn on Wasted trip. You're still paid for the trip.
+        </Text>
+      ) : null}
+    </Card>
   )
 }
 

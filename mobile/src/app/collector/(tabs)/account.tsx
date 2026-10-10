@@ -21,6 +21,7 @@ export default function CollectorAccount() {
       </Card>
       {error ? <ErrorBanner message={error} /> : null}
       <Text style={font.muted}>To change your name, phone or area, ask the WasteCore office.</Text>
+      <Button title="Earnings and how pay works" variant="secondary" onPress={() => router.push("/collector/earnings")} />
       <Button title="Change password" variant="secondary" onPress={() => router.push("/change-password")} />
       <Button
         title="Sign out"

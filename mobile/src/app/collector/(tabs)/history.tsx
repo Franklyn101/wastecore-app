@@ -1,6 +1,7 @@
 import { Text } from "react-native"
 import { JobCard } from "../../../components/JobCard"
-import { Card, ErrorBanner, Loading, Screen } from "../../../components/ui"
+import { Card, ErrorBanner, Loading, Row, Screen } from "../../../components/ui"
+import { naira } from "../../../lib/format"
 import { loadJobs } from "../../../lib/offline"
 import { useFocusData } from "../../../lib/useFocusData"
 import { font } from "../../../theme"
@@ -12,6 +13,12 @@ export default function CollectorHistory() {
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
       <Text style={font.muted}>Jobs you closed in the last 30 days.</Text>
+      {data.history.length ? (
+        <Card>
+          <Row label="Jobs" value={String(data.history.length)} />
+          <Row label="Earned" value={naira(data.history.reduce((sum, j) => sum + (j.pay ?? 0), 0))} />
+        </Card>
+      ) : null}
       {data.history.length === 0 ? (
         <Card>
           <Text style={font.muted}>Nothing yet. Completed jobs will show here.</Text>

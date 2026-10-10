@@ -224,6 +224,8 @@ export type CollectorJob = {
   extraPaid: boolean
   /** What the collector earns for it, once completed. */
   pay: number | null
+  /** What it pays for the bags booked, before it's done. */
+  estimatedPay: number
 }
 
 export type CollectorJobs = {
