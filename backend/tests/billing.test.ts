@@ -119,7 +119,7 @@ describe("subscriptions", () => {
       data: {
         reference,
         status: "success",
-        amount: 10000 * 100,
+        amount: 12000 * 100,
         currency: "NGN",
         channel: "card",
         paid_at: new Date().toISOString(),
@@ -161,7 +161,7 @@ describe("subscriptions", () => {
 
   it("upgrades mid-period with credit for unused days, and blocks wasteful downgrades", async () => {
     const auth = await customer()
-    const oldId = await subscribe(auth, "weekly_1") // ₦5,000 per 4 weeks
+    const oldId = await subscribe(auth, "weekly_1") // ₦6,000 per 4 weeks
     await payFor(auth, { subscriptionId: oldId })
 
     // Halfway through the period.
@@ -170,13 +170,13 @@ describe("subscriptions", () => {
       data: { currentPeriodStart: addDays(today(), -14), currentPeriodEnd: addDays(today(), 14) },
     })
     const quote = await request(app).get(`/subscriptions/${oldId}/change-quote`).query({ plan: "premium" }).set(auth)
-    expect(quote.body.quote).toMatchObject({ credit: 2500, amountDue: 32500, allowed: true })
+    expect(quote.body.quote).toMatchObject({ credit: 3000, amountDue: 62000, allowed: true })
 
     const change = await request(app).post(`/subscriptions/${oldId}/change`).set(auth).send({ plan: "premium" })
     expect(change.status).toBe(201)
     const newId = change.body.subscription.id
     const start = await request(app).post("/payments").set(auth).send({ subscriptionId: newId, email: "ada@example.com" })
-    expect(start.body.payment.amount).toBe(32500)
+    expect(start.body.payment.amount).toBe(62000)
     paystack.pay(start.body.payment.reference)
     await request(app).get(`/payments/${start.body.payment.reference}`).set(auth)
 

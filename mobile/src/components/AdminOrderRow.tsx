@@ -1,6 +1,6 @@
 import { router } from "expo-router"
 import { Pressable, Text, View } from "react-native"
-import { naira, ORDER_TYPE_LABELS, orderStatus, orderSummary, pickupWhen } from "../lib/format"
+import { naira, orderTitle, orderStatus, orderSummary, pickupWhen } from "../lib/format"
 import type { AdminOrder } from "../lib/types"
 import { colors, font, spacing } from "../theme"
 import { listCard, pressedCard } from "./OrderCard"
@@ -30,7 +30,7 @@ export function AdminOrderRow({ order }: { order: AdminOrder }) {
           </View>
         </View>
         <Text style={font.body}>
-          {ORDER_TYPE_LABELS[order.type]} — {what}
+          {orderTitle(order)} — {what}
         </Text>
         <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.sm }}>
           <Text style={[font.muted, { flexShrink: 1 }]} numberOfLines={1}>

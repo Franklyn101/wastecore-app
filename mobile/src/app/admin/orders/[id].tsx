@@ -6,7 +6,7 @@ import { Badge, Button, Card, ErrorBanner, Loading, OptionCard, Row, Screen, Sec
 import { api } from "../../../lib/api"
 import { useIsOwner } from "../../../lib/auth"
 import { confirmAction } from "../../../lib/dialogs"
-import { assignable, formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../../lib/format"
+import { assignable, formatDate, naira, orderTitle, orderStatus, pickupWhen } from "../../../lib/format"
 import type { AdminOrder, Collector } from "../../../lib/types"
 import { directionsUrl } from "../../../lib/location"
 import { useFocusData } from "../../../lib/useFocusData"
@@ -69,7 +69,7 @@ export default function ManageOrder() {
       <Card>
         <View style={styles.headerRow}>
           <Text style={font.heading}>
-            {ORDER_TYPE_LABELS[order.type]} · {order.reference}
+            {orderTitle(order)} · {order.reference}
           </Text>
           <Badge label={status.label} tone={status.tone} />
         </View>
@@ -138,13 +138,16 @@ export default function ManageOrder() {
           <Card>
             {order.onTheWayAt ? <Row label="On the way" value={formatDateTime(order.onTheWayAt)} /> : null}
             {order.completedAt ? (
-              <Row label={order.status === "INCOMPLETE" ? "Closed (not done)" : "Completed"} value={formatDateTime(order.completedAt)} />
+              <Row
+                label={order.wastedTrip ? "Closed (wasted trip)" : order.status === "INCOMPLETE" ? "Closed (not done)" : "Completed"}
+                value={formatDateTime(order.completedAt)}
+              />
             ) : null}
             {order.bagsCollected !== null ? <Row label="Bags collected" value={`${order.bagsCollected} (booked ${order.quantity})`} /> : null}
             {order.weightKg !== null ? <Row label="Weight" value={`${order.weightKg} kg`} /> : null}
             {order.extraAmount > 0 ? (
               <Row
-                label="Extra bags"
+                label={order.wastedTrip ? "Wasted-trip fee" : "Extra bags"}
                 value={`${naira(order.extraAmount)} · ${order.extraPaidAt ? `paid${order.extraPaymentMethod === "CASH" ? " in cash to collector" : " online"}` : "unpaid"}`}
               />
             ) : null}
@@ -188,6 +191,7 @@ export default function ManageOrder() {
           <Row label={isBags ? "Bags" : "Plan"} value={order.planLabel} />
           {isBags ? <Row label="Packs" value={String(order.quantity)} /> : null}
           {order.type === "INSTANT_PICKUP" ? <Row label="Bags" value={String(order.quantity)} /> : null}
+          {order.wastecoreBags ? <Row label="WasteCore bags to bring" value={String(order.wastecoreBags)} /> : null}
           {order.wasteType ? <Row label="Waste type" value={order.wasteType} /> : null}
           <Row
             label={isBags ? "Ordered" : "Pickup"}

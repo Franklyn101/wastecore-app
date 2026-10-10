@@ -1,4 +1,5 @@
 import { findPlan, planLabel } from "./catalog.ts"
+import { isInstant } from "./earnings.ts"
 import type { Collector, Order, Subscription, SupportTicket } from "./generated/prisma/client.ts"
 
 const dateOnly = (date: Date) => date.toISOString().slice(0, 10)
@@ -24,6 +25,8 @@ export function customerOrder(order: Order) {
     rating: order.rating,
     ratingComment: order.ratingComment,
     quantity: order.quantity,
+    wastecoreBags: order.wastecoreBags,
+    wastedTrip: order.wastedTrip,
     bagsCollected: order.bagsCollected,
     weightKg: order.weightKg,
     extraAmount: order.extraAmount,
@@ -90,6 +93,12 @@ export function collectorJob(order: Order & { user: { name: string; phone: strin
     asap: order.asap,
     timeWindow: order.timeWindow,
     quantity: order.quantity,
+    // Bags the customer has paid for; more are charged as extra bags.
+    includedBags: order.type === "PLAN_PICKUP" ? findPlan(order.plan).bagsPerPickup : order.quantity,
+    // Booked "as soon as possible": extra bags are charged at the instant price.
+    instant: isInstant(order),
+    wastecoreBags: order.wastecoreBags,
+    wastedTrip: order.wastedTrip,
     status: order.status,
     notes: order.adminNote,
     customer: { name: order.user.name, phone: order.user.phone },
@@ -116,6 +125,7 @@ export function subscription(s: Subscription) {
     planName: plan.name,
     planGroup: plan.group,
     pickupsPerWeek: plan.pickupsPerWeek,
+    bagsPerPickup: plan.bagsPerPickup,
     price: plan.price,
     periodLabel: plan.periodLabel,
     status: s.status,

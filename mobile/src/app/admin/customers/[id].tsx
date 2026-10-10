@@ -5,7 +5,7 @@ import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen, Section, TextFi
 import { api } from "../../../lib/api"
 import { useIsOwner } from "../../../lib/auth"
 import { confirmAction } from "../../../lib/dialogs"
-import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus, SUBSCRIPTION_STATUS } from "../../../lib/format"
+import { formatDate, naira, orderTitle, orderStatus, SUBSCRIPTION_STATUS } from "../../../lib/format"
 import { useFocusData } from "../../../lib/useFocusData"
 import { useSubmit } from "../../../lib/useSubmit"
 import { colors, font, spacing } from "../../../theme"
@@ -95,7 +95,7 @@ export default function CustomerDetails() {
             <Card style={{ paddingVertical: spacing.md, gap: 2 }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.sm }}>
                 <Text style={font.label}>
-                  {ORDER_TYPE_LABELS[o.type]} · {o.reference}
+                  {orderTitle(o)} · {o.reference}
                 </Text>
                 <Badge label={orderStatus(o).label} tone={orderStatus(o).tone} />
               </View>

@@ -38,7 +38,7 @@ export default function PlanCheckout() {
         <Row label="Plan" value={sub.planName} />
         <Row label="Price" value={`${naira(sub.price)} ${sub.periodLabel}`} />
         {sub.credit > 0 && isNew ? <Row label="Credit from current plan" value={`−${naira(sub.credit)}`} /> : null}
-        <Row label="Pickups" value={`${sub.pickupsPerWeek === 7 ? "Daily" : `${sub.pickupsPerWeek}× a week`}`} />
+        <Row label="Pickups" value={`${sub.pickupsPerWeek === 7 ? "Daily" : `${sub.pickupsPerWeek}× a week`}, up to ${sub.bagsPerPickup} bags each`} />
         <Row label="Address" value={sub.address} />
         {isNew ? (
           <Row label="Starts" value={formatDate(sub.replacesId ? upcomingDates(1)[0] : sub.startDate)} />

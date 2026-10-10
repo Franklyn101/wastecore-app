@@ -138,7 +138,7 @@ describe("orders", () => {
       .post("/orders")
       .set(ada)
       .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Yaba", wasteType: "Organic", pickupDate: tomorrow })
-    expect(body.order.amount).toBe(700) // 1 bag by default
+    expect(body.order.amount).toBe(1000) // 1 bag by default: the scheduled minimum
 
     expect((await request(app).get(`/orders/${body.order.id}`).set(bayo)).status).toBe(404)
     expect((await request(app).post(`/orders/${body.order.id}/cancel`).set(bayo)).status).toBe(404)
@@ -275,16 +275,45 @@ describe("instant pickup", () => {
         .set(auth)
         .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Yaba", wasteType: "Plastic", ...body })
 
+    // A chosen date is a scheduled pickup: ₦650 for each of the first 3 bags.
     const three = await book({ bags: 3, pickupDate: tomorrow })
-    expect(three.body.order).toMatchObject({ amount: 2100, quantity: 3, asap: false, scheduledDate: tomorrow })
+    expect(three.body.order).toMatchObject({ amount: 1950, quantity: 3, asap: false, scheduledDate: tomorrow, plan: "scheduled", planLabel: "Scheduled pickup" })
 
+    // "As soon as possible" is instant: ₦1,000 each for the first 3.
     const asap = await book({ bags: 2, asap: true })
-    expect(asap.body.order).toMatchObject({ amount: 1400, asap: true })
+    expect(asap.body.order).toMatchObject({ amount: 2000, asap: true, plan: "instant" })
     expect(asap.body.order.scheduledDate).toBe(asapDate())
 
     expect((await book({ bags: 2 })).status).toBe(400) // no date and not ASAP
     expect((await book({ bags: 0, asap: true })).status).toBe(400)
     expect((await book({ bags: 21, asap: true })).status).toBe(400)
+    expect((await book({ bags: 1, asap: true, wastecoreBags: 21 })).status).toBe(400)
+  })
+
+  it("matches the pricing sheet, with minimums and WasteCore bags", async () => {
+    const auth = { Authorization: `Bearer ${await register()}` }
+    const price = async (bags: number, asap: boolean, wastecoreBags = 0) => {
+      const { body } = await request(app)
+        .post("/orders")
+        .set(auth)
+        .send({ type: "INSTANT_PICKUP", ...YENAGOA, address: "Yaba", wasteType: "Mixed", bags, wastecoreBags, ...(asap ? { asap } : { pickupDate: tomorrow }) })
+      return body.order.amount
+    }
+    expect(await price(1, false)).toBe(1000) // minimum (₦650 for one bag)
+    expect(await price(2, false)).toBe(1300)
+    expect(await price(3, false)).toBe(1950)
+    expect(await price(5, false)).toBe(2950) // 3 × 650 + 2 × 500
+    expect(await price(10, false)).toBe(5450)
+    expect(await price(1, true)).toBe(1500) // minimum (₦1,000 for one bag)
+    expect(await price(3, true)).toBe(3000)
+    expect(await price(5, true)).toBe(4400) // 3 × 1,000 + 2 × 700
+    expect(await price(10, true)).toBe(7900)
+    expect(await price(3, false, 2)).toBe(1950 + 600) // plus ₦300 per WasteCore bag
+
+    const { body } = await request(app).get("/catalog")
+    expect(body.pickupPricing).toMatchObject({ scheduled: { firstBags: 650, extraBag: 500, minimum: 1000 }, tierBags: 3, wastecoreBag: 300 })
+    expect(body.pickupPricing.collector).toBeUndefined() // collector pay isn't public
+    expect(body.plans.find((p: { id: string }) => p.id === "weekly_1")).toMatchObject({ price: 6000, bagsPerPickup: 3, priceNote: "₦1,500/week" })
   })
 
   it("schedules ASAP for today before 5pm Lagos time and tomorrow after", () => {

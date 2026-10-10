@@ -50,6 +50,7 @@ async function createPlanPickups(tx: Tx, sub: Subscription, start: Date, end: Da
       wasteType: sub.wasteType,
       timeWindow: sub.timeWindow,
       scheduledDate,
+      quantity: plan.bagsPerPickup,
       amount: 0,
       status: sub.collectorId ? ("ASSIGNED" as const) : ("PENDING" as const),
       paymentMethod: "PAYSTACK" as const,

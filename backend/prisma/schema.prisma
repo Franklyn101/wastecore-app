@@ -310,7 +310,11 @@ model Order {
   // Bags actually collected. For instant pickups, bags beyond what was booked are owed as a balance.
   bagsCollected      Int?
   weightKg           Float? // weighed at pickup, when the collector has a scale
-  extraAmount        Int            @default(0) // naira owed for the extra bags
+  // WasteCore bags the collector brings to a pickup; paid for when booking.
+  wastecoreBags      Int            @default(0)
+  // The collector came but there was no waste or nobody home; extraAmount is then the fee.
+  wastedTrip         Boolean        @default(false)
+  extraAmount        Int            @default(0) // naira owed for extra bags (or a wasted trip)
   extraPaidAt        DateTime?
   extraPaymentMethod PaymentMethod?
   // What the collector earns for this job, fixed when it is completed; payoutId is set once they're paid.
@@ -552,4 +556,12 @@ model Disposal {
   area      ServiceArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
 
   @@index([disposedAt])
+}
+
+// App-wide settings the main admin can change, e.g. prices ("pricing").
+model Setting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
 }

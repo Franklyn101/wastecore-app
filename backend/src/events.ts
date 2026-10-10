@@ -111,6 +111,15 @@ export const events = {
     if (byCollector) await notifyStaff({ title: "Job not completed", body: `${order.reference}: ${reason}`, url: staffUrl(order) })
   },
 
+  async wastedTrip(order: Order, reason: string) {
+    await notify(order.userId, {
+      title: "Wasted trip",
+      body: `Your collector came for ${order.reference}: ${reason}. A wasted-trip fee of ${naira(order.extraAmount)} applies; you can pay it in the app.`,
+      url: customerUrl(order),
+    })
+    await notifyStaff({ title: "Wasted trip", body: `${order.reference}: ${reason}`, url: staffUrl(order) })
+  },
+
   async extraBagsDue(order: Order) {
     await notify(order.userId, {
       title: "Extra bags collected",

@@ -1,7 +1,8 @@
 import { Router } from "express"
 import { z } from "zod"
 import { currentUser, requireCustomer, requireUser } from "../auth.ts"
-import { BAG_SIZES, bagSizeIds, INSTANT_PICKUP, MAX_BAG_PACKS } from "../catalog.ts"
+import { BAG_SIZES, bagSizeIds, INSTANT_PICKUP, MAX_BAG_PACKS, SCHEDULED_PICKUP } from "../catalog.ts"
+import { pickupPrice, pricing } from "../pricing.ts"
 import { prisma } from "../db.ts"
 import { assertRoom, firstDayWithRoom } from "../capacity.ts"
 import { assertInStock } from "../stock.ts"
@@ -32,7 +33,14 @@ const createOrderSchema = z.discriminatedUnion("type", [
         .min(1, "Add at least 1 bag.")
         .max(INSTANT_PICKUP.maxBags, `For more than ${INSTANT_PICKUP.maxBags} bags, please contact support.`)
         .default(1),
-      // Either "as soon as possible" or a chosen date.
+      // WasteCore bags for the collector to bring.
+      wastecoreBags: z.coerce
+        .number()
+        .int("Number of WasteCore bags must be a whole number.")
+        .min(0)
+        .max(INSTANT_PICKUP.maxWastecoreBags, `You can ask for at most ${INSTANT_PICKUP.maxWastecoreBags} WasteCore bags.`)
+        .default(0),
+      // Either "as soon as possible" (instant price) or a chosen date (scheduled price).
       asap: z.boolean().default(false),
       pickupDate: futureDateSchema.optional(),
       timeWindow,
@@ -61,19 +69,21 @@ export function asapDate(now = new Date()): string {
   return hourInLagos(now) < INSTANT_PICKUP.asapCutoffHour ? day : ymd(addDays(toDay(day), 1))
 }
 
-/** Prices the order from the catalog. The client never sends an amount. */
+/** Prices the order from the catalog and pricing. The client never sends an amount. */
 function orderData(body: CreateOrder) {
   if (body.type === "INSTANT_PICKUP") {
     return {
       type: body.type as OrderType,
-      plan: INSTANT_PICKUP.id,
+      // Which price applies; kept even if the pickup is later moved to another day.
+      plan: body.asap ? INSTANT_PICKUP.id : SCHEDULED_PICKUP.id,
       wasteType: body.wasteType,
       scheduledDate: body.asap ? asapDate() : body.pickupDate!,
       asap: body.asap,
       // "As soon as possible" means the next free slot, so no time window.
       timeWindow: body.asap ? null : (body.timeWindow ?? null),
       quantity: body.bags,
-      amount: INSTANT_PICKUP.pricePerBag * body.bags,
+      wastecoreBags: body.wastecoreBags,
+      amount: pickupPrice(body.bags, body.asap) + body.wastecoreBags * pricing().wastecoreBag,
     }
   }
   return {

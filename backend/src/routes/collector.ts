@@ -8,6 +8,7 @@ import { HttpError } from "../http.ts"
 import { events } from "../events.ts"
 import { distanceKm } from "../areas.ts"
 import { earningsSummary, extraBagsCharge, payFor } from "../earnings.ts"
+import { pricing } from "../pricing.ts"
 import { collectorJob } from "../serializers.ts"
 import { bagsDelivered } from "../stock.ts"
 import { imageUpload, looksLikeImage, saveImage } from "../storage.ts"
@@ -187,14 +188,24 @@ collectorRouter.post("/collector/jobs/:id/complete", imageUpload.single("proof")
 })
 
 // Couldn't do it (customer away, gate locked...). The reason is shown to the customer and the office.
+// A wasted trip (no waste, or nobody home) on a pickup charges the customer a fee and pays the collector.
 collectorRouter.post("/collector/jobs/:id/incomplete", async (req, res) => {
   const collector = currentCollector(req)
-  const { reason } = z
-    .object({ reason: z.string().trim().min(3, "Say why the job couldn't be done.").max(500) })
+  const { reason, wastedTrip } = z
+    .object({
+      reason: z.string().trim().min(3, "Say why the job couldn't be done.").max(500),
+      wastedTrip: z.boolean().optional(),
+    })
     .parse(req.body)
   const job = await openJob(req.params.id, collector)
-  const closed = await close(job.id, collector, { status: "INCOMPLETE", collectorNote: reason })
-  await events.notCompleted(closed, reason, true)
+  const charge = Boolean(wastedTrip) && (job.type === "INSTANT_PICKUP" || job.type === "PLAN_PICKUP")
+  const p = pricing()
+  const closed = await close(job.id, collector, {
+    status: "INCOMPLETE",
+    collectorNote: reason,
+    ...(charge ? { wastedTrip: true, extraAmount: p.wastedTripFee, collectorPay: p.collector.wastedTrip } : {}),
+  })
+  await (charge ? events.wastedTrip(closed, reason) : events.notCompleted(closed, reason, true))
   res.json({ job: collectorJob(closed) })
 })
 

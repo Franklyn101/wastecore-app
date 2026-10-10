@@ -356,7 +356,7 @@ adminRouter.post("/admin/collectors/:id/payouts", requireOwner, async (req, res)
   const collector = await findCollector(req.params.id)
   const payout = await prisma.$transaction(async (tx) => {
     const jobs = await tx.order.findMany({
-      where: { collectorId: collector.id, status: "COMPLETED", collectorPay: { not: null }, payoutId: null },
+      where: { collectorId: collector.id, status: { in: ["COMPLETED", "INCOMPLETE"] }, collectorPay: { not: null }, payoutId: null },
       select: { id: true, collectorPay: true, extraAmount: true, extraPaymentMethod: true },
     })
     if (jobs.length === 0) throw new HttpError(409, "Nothing to pay: no completed jobs since the last payout.")

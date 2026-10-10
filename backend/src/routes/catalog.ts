@@ -2,22 +2,27 @@ import { Router } from "express"
 import {
   BAG_SIZES,
   INSTANT_PICKUP,
+  plans,
+  SCHEDULED_PICKUP,
   MAX_BAG_PACKS,
   SUPPORT_CATEGORIES,
-  PLANS,
   SPECIAL_WASTE_CATEGORIES,
   TIME_WINDOWS,
   WASTE_TYPES,
 } from "../catalog.ts"
 import { config } from "../config.ts"
 import { paystackEnabled } from "../paystack.ts"
+import { pricing } from "../pricing.ts"
 
 export const catalogRouter = Router()
 
 catalogRouter.get("/catalog", (_req, res) => {
   res.json({
     instantPickup: INSTANT_PICKUP,
-    plans: PLANS,
+    scheduledPickup: SCHEDULED_PICKUP,
+    // What customers pay. Collector pay isn't public.
+    pickupPricing: (({ scheduled, instant, tierBags, wastecoreBag, wastedTripFee }) => ({ scheduled, instant, tierBags, wastecoreBag, wastedTripFee }))(pricing()),
+    plans: plans(),
     bagSizes: BAG_SIZES,
     maxBagPacks: MAX_BAG_PACKS,
     wasteTypes: WASTE_TYPES,

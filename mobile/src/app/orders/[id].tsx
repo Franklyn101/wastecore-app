@@ -9,7 +9,7 @@ import { Badge, Button, Card, ErrorBanner, Loading, Row, Screen } from "../../co
 import { api } from "../../lib/api"
 import { useCatalog } from "../../lib/catalog"
 import { confirmAction } from "../../lib/dialogs"
-import { formatDate, naira, ORDER_TYPE_LABELS, orderStatus, pickupWhen } from "../../lib/format"
+import { formatDate, naira, orderTitle, orderStatus, pickupWhen } from "../../lib/format"
 import type { Order } from "../../lib/types"
 import { useFocusData } from "../../lib/useFocusData"
 import { useSubmit } from "../../lib/useSubmit"
@@ -49,7 +49,9 @@ function nextStepText(order: Order): string {
     case "COMPLETED":
       return "All done. Thank you for keeping your environment clean!"
     case "INCOMPLETE":
-      return "This order couldn't be completed. Contact support if you need help."
+      return order.wastedTrip
+        ? "Your collector came, but there was nothing to collect. A wasted-trip fee applies."
+        : "This order couldn't be completed. Contact support if you need help."
     case "CANCELLED":
       return order.skippedAt ? "You skipped this pickup. Your other plan pickups are unchanged." : "This order was cancelled."
   }
@@ -107,7 +109,7 @@ export default function OrderDetails() {
     <Screen refreshing={refreshing} onRefresh={refresh}>
       <Card>
         <View style={styles.headerRow}>
-          <Text style={font.heading}>{ORDER_TYPE_LABELS[current.type]}</Text>
+          <Text style={font.heading}>{orderTitle(current)}</Text>
           <Badge label={status.label} tone={status.tone} />
         </View>
         <Text style={font.muted}>{nextStepText(current)}</Text>
@@ -125,12 +127,16 @@ export default function OrderDetails() {
 
       {current.extraAmount > 0 ? (
         <Card style={current.extraPaidAt ? undefined : { backgroundColor: colors.warningSoft, borderColor: colors.warning }}>
-          <Text style={font.heading}>Extra bags</Text>
+          <Text style={font.heading}>{current.wastedTrip ? "Wasted-trip fee" : "Extra bags"}</Text>
           <Text style={font.body}>
-            Your collector took {current.bagsCollected} bags; you booked {current.quantity}.{" "}
+            {current.wastedTrip
+              ? "Your collector came, but there was no waste to collect or nobody was home. "
+              : current.type === "PLAN_PICKUP"
+                ? `Your collector took ${current.bagsCollected} bags; your plan includes ${current.quantity}. `
+                : `Your collector took ${current.bagsCollected} bags; you booked ${current.quantity}. `}
             {current.extraPaidAt
               ? `${naira(current.extraAmount)} paid${current.extraPaymentMethod === "CASH" ? " in cash" : ""}. Thank you!`
-              : `Please pay ${naira(current.extraAmount)} for the extra bags.`}
+              : `Please pay ${naira(current.extraAmount)}${current.wastedTrip ? "." : " for the extra bags."}`}
           </Text>
           {!current.extraPaidAt && online ? (
             <PayButton
@@ -242,6 +248,8 @@ export default function OrderDetails() {
         />
         {current.type === "WASTE_BAGS" ? <Row label="Packs" value={String(current.quantity)} /> : null}
         {current.type === "INSTANT_PICKUP" ? <Row label="Bags" value={String(current.quantity)} /> : null}
+        {current.type === "PLAN_PICKUP" ? <Row label="Bags included" value={`Up to ${current.quantity}`} /> : null}
+        {current.wastecoreBags ? <Row label="WasteCore bags" value={`${current.wastecoreBags} (your collector brings them)`} /> : null}
         {current.bagsCollected !== null && current.bagsCollected !== current.quantity ? (
           <Row label="Bags collected" value={String(current.bagsCollected)} />
         ) : null}

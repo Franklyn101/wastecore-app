@@ -30,6 +30,11 @@ export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
   SPECIAL_PICKUP: "Special pickup",
 }
 
+/** e.g. "Scheduled pickup" for a one-off pickup booked for a chosen date. */
+export function orderTitle(order: { type: OrderType; plan: string }): string {
+  return order.type === "INSTANT_PICKUP" && order.plan === "scheduled" ? "Scheduled pickup" : ORDER_TYPE_LABELS[order.type]
+}
+
 type Tone = "warning" | "info" | "success" | "danger" | "muted"
 
 export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: Tone }> = {

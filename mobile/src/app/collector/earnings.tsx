@@ -22,13 +22,21 @@ export default function CollectorEarnings() {
       </Card>
 
       <Card>
-        <Row label="Last 7 days" value={`${naira(data.lastSevenDays.earned)} · ${data.lastSevenDays.jobs} jobs`} />
+        <Row label="Last 7 days" value={`${naira(data.lastSevenDays.earned)} · ${data.lastSevenDays.jobs} job${data.lastSevenDays.jobs === 1 ? "" : "s"}`} />
       </Card>
 
       <Section title="How pay works">
+        <Card style={{ gap: spacing.xs }}>
+          <Row label="Scheduled pickup" value={`${naira(rates.scheduled.perStop)} + ${naira(rates.scheduled.perBag)}/bag`} />
+          <Row label="Instant pickup" value={`${naira(rates.instant.perStop)} + ${naira(rates.instant.perBag)}/bag`} />
+          <Row label="WasteCore bag handed out" value={`${naira(rates.perBagHandedOut)} each`} />
+          <Row label="Wasted trip" value={naira(rates.wastedTrip)} />
+          <Row label="Bag delivery" value={naira(rates.bagDelivery)} />
+          <Row label="Special pickup" value={naira(rates.specialPickup)} />
+        </Card>
         <Text style={font.muted}>
-          {naira(rates.pickup)} per pickup plus {naira(rates.perBag)} per bag collected. {naira(rates.bagDelivery)} per bag
-          delivery. Any cash customers give you for extra bags is taken off your next payout.
+          Every pickup pays a fixed amount for the trip plus an amount for each bag you collect. Plan pickups pay the scheduled rate.
+          Any cash customers give you for extra bags is taken off your next payout.
         </Text>
       </Section>
 

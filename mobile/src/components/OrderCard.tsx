@@ -1,6 +1,6 @@
 import { router } from "expo-router"
 import { Pressable, Text, View } from "react-native"
-import { naira, ORDER_TYPE_LABELS, orderStatus, orderSummary, pickupWhen } from "../lib/format"
+import { naira, orderTitle, orderStatus, orderSummary, pickupWhen } from "../lib/format"
 import type { Order } from "../lib/types"
 import { colors, font, hairline, radius, shadow, spacing } from "../theme"
 import { OrderIcon } from "./OrderIcon"
@@ -25,7 +25,7 @@ export function OrderCard({ order }: { order: Order }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${ORDER_TYPE_LABELS[order.type]} ${order.reference}, ${status.label}`}
+      accessibilityLabel={`${orderTitle(order)} ${order.reference}, ${status.label}`}
       onPress={() => router.push(`/orders/${order.id}`)}
       style={({ pressed }) => [listCard, pressed && pressedCard]}
     >
@@ -33,7 +33,7 @@ export function OrderCard({ order }: { order: Order }) {
       <View style={{ flex: 1, gap: 4 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm }}>
           <Text style={[font.label, { flexShrink: 1 }]} numberOfLines={1}>
-            {ORDER_TYPE_LABELS[order.type]}
+            {orderTitle(order)}
           </Text>
           <Badge label={status.label} tone={status.tone} />
         </View>

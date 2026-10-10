@@ -41,6 +41,7 @@ export default function AdminAccount() {
       </Card>
 
       <Button title="Service areas" variant="secondary" onPress={() => router.push("/admin/areas")} />
+      <Button title="Pricing and collector pay" variant="secondary" onPress={() => router.push("/admin/pricing")} />
 
       {owner ? (
         <Section title="Help someone who's locked out">

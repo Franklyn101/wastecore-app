@@ -174,7 +174,7 @@ describe("problems and payments", () => {
     expect(history.payments).toHaveLength(0)
     await request(app).patch(`/admin/orders/${id}`).set(staff).send({ status: "PENDING" })
     history = (await request(app).get("/payments").set(user)).body
-    expect(history.payments[0]).toMatchObject({ amount: 1400, method: "Bank transfer", description: "Instant pickup, 2 bags" })
-    expect(history.total).toBe(1400)
+    expect(history.payments[0]).toMatchObject({ amount: 1300, method: "Bank transfer", description: "Scheduled pickup, 2 bags" })
+    expect(history.total).toBe(1300)
   })
 })

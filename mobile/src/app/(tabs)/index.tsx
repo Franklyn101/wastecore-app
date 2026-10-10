@@ -48,7 +48,7 @@ export default function Home() {
   // The WhatsApp bot's services, plus quotes for special waste. Instant pickup leads; support sits below.
   const instant = {
     title: "Instant pickup",
-    subtitle: catalog ? `One-time · ${naira(catalog.instantPickup.pricePerBag)}/bag` : "One-time pickup",
+    subtitle: catalog ? `One-time · from ${naira(catalog.pickupPricing.scheduled.firstBags)}/bag` : "One-time pickup",
   }
   const services: Service[] = [
     {

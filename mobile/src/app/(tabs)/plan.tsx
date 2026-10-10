@@ -70,7 +70,8 @@ export default function MyPlan() {
         </View>
         <Text style={font.muted}>
           {naira(plan.price)} {plan.periodLabel} ·{" "}
-          {plan.pickupsPerWeek === 7 ? "daily pickups" : `${plan.pickupsPerWeek} pickup${plan.pickupsPerWeek > 1 ? "s" : ""} a week`}
+          {plan.pickupsPerWeek === 7 ? "daily pickups" : `${plan.pickupsPerWeek} pickup${plan.pickupsPerWeek > 1 ? "s" : ""} a week`} · up to{" "}
+          {plan.bagsPerPickup} bags each
         </Text>
         {plan.status === "ACTIVE" && plan.currentPeriodEnd ? (
           <Row

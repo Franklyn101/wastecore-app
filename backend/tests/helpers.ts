@@ -1,4 +1,5 @@
 import { prisma } from "../src/db.ts"
+import { resetPricingCache } from "../src/pricing.ts"
 
 /** A spot in central Yenagoa, inside the launch area. */
 export const YENAGOA = { lat: 4.9247, lng: 6.2676 }
@@ -15,6 +16,8 @@ export async function resetDatabase() {
   await prisma.stockMovement.deleteMany()
   await prisma.auditLog.deleteMany()
   await prisma.disposal.deleteMany()
+  await prisma.setting.deleteMany()
+  resetPricingCache()
   // Service areas are seeded by the migration; put them back to launch state.
   await prisma.serviceArea.updateMany({ data: { active: false, autoAssign: false, dailyCapacity: null } })
   await prisma.serviceArea.update({ where: { slug: "yenagoa" }, data: { active: true, radiusKm: 15, centerLat: YENAGOA.lat, centerLng: YENAGOA.lng } })

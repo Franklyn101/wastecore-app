@@ -37,7 +37,11 @@ export type Order = {
   rating: number | null
   ratingComment: string | null
   quantity: number
-  /** Bags the collector actually took; extra bags on an instant pickup are owed as `extraAmount`. */
+  /** WasteCore bags the collector brings (paid for when booking). */
+  wastecoreBags: number
+  /** The collector came but there was no waste or nobody home; `extraAmount` is the fee. */
+  wastedTrip: boolean
+  /** Bags the collector actually took; extra bags are owed as `extraAmount`. */
   bagsCollected: number | null
   weightKg: number | null
   extraAmount: number
@@ -66,6 +70,7 @@ export type Subscription = {
   planName: string
   planGroup: "weekly" | "premium"
   pickupsPerWeek: number
+  bagsPerPickup: number
   price: number
   periodLabel: string
   status: SubscriptionStatus
@@ -116,10 +121,23 @@ export type Plan = {
   group: "weekly" | "premium"
   name: string
   pickupsPerWeek: number
+  bagsPerPickup: number
   price: number
   periodLabel: string
   priceNote?: string
   features: string[]
+}
+
+/** Customer prices for a one-off pickup at one speed. */
+export type SpeedPrices = { firstBags: number; extraBag: number; minimum: number }
+
+export type PickupPricing = {
+  scheduled: SpeedPrices
+  instant: SpeedPrices
+  /** How many bags are charged at the first-bags price. */
+  tierBags: number
+  wastecoreBag: number
+  wastedTripFee: number
 }
 
 export type Catalog = {
@@ -127,10 +145,12 @@ export type Catalog = {
     id: string
     name: string
     description: string
-    pricePerBag: number
     maxBags: number
+    maxWastecoreBags: number
     asapCutoffHour: number
   }
+  scheduledPickup: { id: string; name: string; description: string }
+  pickupPricing: PickupPricing
   plans: Plan[]
   bagSizes: { id: string; name: string; packSize: number; price: number }[]
   maxBagPacks: number
@@ -183,6 +203,12 @@ export type CollectorJob = {
   asap: boolean
   timeWindow: TimeWindow | null
   quantity: number
+  /** Bags the customer has paid for; more are charged as extra bags. */
+  includedBags: number
+  /** Booked "as soon as possible" (instant prices). */
+  instant: boolean
+  wastecoreBags: number
+  wastedTrip: boolean
   status: OrderStatus
   notes: string | null
   customer: { name: string; phone: string }
@@ -266,7 +292,7 @@ export type PaymentRecord = {
 export type RouteStop = CollectorJob & { legKm: number | null }
 
 export type Earnings = {
-  rates: { pickup: number; perBag: number; bagDelivery: number }
+  rates: CollectorRates
   unpaid: { jobs: number; earned: number; cashHeld: number; due: number }
   lastSevenDays: { jobs: number; earned: number }
   payouts: { id: string; amount: number; jobs: number; note: string | null; createdAt: string }[]
@@ -408,4 +434,25 @@ export type WasteReport = {
     byKind: { kind: DisposalKind; loads: number; kg: number }[]
     bySite: { site: string; kind: DisposalKind; loads: number; kg: number }[]
   }
+}
+
+export type CollectorRates = {
+  scheduled: { perStop: number; perBag: number }
+  instant: { perStop: number; perBag: number }
+  perBagHandedOut: number
+  wastedTrip: number
+  bagDelivery: number
+  specialPickup: number
+}
+
+/** Everything the main admin can change on the Pricing screen. */
+export type Pricing = PickupPricing & {
+  collector: CollectorRates
+  plans: Record<string, { price: number; bagsPerPickup: number }>
+}
+
+export type PricingView = {
+  pricing: Pricing
+  defaults: Pricing
+  plans: { id: string; name: string; periodLabel: string; pickupsPerWeek: number }[]
 }

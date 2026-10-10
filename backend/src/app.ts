@@ -16,9 +16,11 @@ import { staffRouter } from "./routes/staff.ts"
 import { wasteRouter } from "./routes/waste.ts"
 import { passwordRouter } from "./routes/password.ts"
 import { paymentsRouter, paystackWebhook } from "./routes/payments.ts"
+import { pricingRouter } from "./routes/pricing.ts"
 import { subscriptionsRouter } from "./routes/subscriptions.ts"
 import { supportRouter } from "./routes/support.ts"
 import { verifyRouter } from "./routes/verify.ts"
+import { refreshPricing } from "./pricing.ts"
 import { UPLOAD_DIR } from "./storage.ts"
 
 export function createApp() {
@@ -29,6 +31,10 @@ export function createApp() {
   app.use(cors())
   app.use(paystackWebhook) // needs the raw body, so it comes before express.json()
   app.use(express.json({ limit: "100kb" }))
+  // Prices the main admin set (cached for a few seconds).
+  app.use((_req, _res, next) => {
+    refreshPricing().then(() => next(), next)
+  })
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" })
@@ -37,7 +43,7 @@ export function createApp() {
   // The logo, for emails.
   app.use("/brand", express.static(path.resolve("public/brand"), { fallthrough: false, index: false, maxAge: "7d" }))
 
-  app.use(authRouter, passwordRouter, verifyRouter, areasRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, adminRouter, operationsRouter, staffRouter, quotesRouter, wasteRouter, collectorRouter, notificationsRouter)
+  app.use(authRouter, passwordRouter, verifyRouter, areasRouter, catalogRouter, ordersRouter, subscriptionsRouter, paymentsRouter, supportRouter, pricingRouter, adminRouter, operationsRouter, staffRouter, quotesRouter, wasteRouter, collectorRouter, notificationsRouter)
 
   app.use((_req, _res, next) => next(new HttpError(404, "Not found.")))
   app.use(errorHandler)

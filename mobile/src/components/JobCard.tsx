@@ -17,8 +17,14 @@ export const JOB_KIND: Record<CollectorJob["type"], string> = {
 /** "3 bags · Plastic", "Medium bags × 2 packs", "Mixed". */
 export function jobLoad(job: CollectorJob): string {
   if (job.type === "WASTE_BAGS") return `${job.planLabel} bags × ${job.quantity} pack${job.quantity === 1 ? "" : "s"}`
-  const bags = job.type === "INSTANT_PICKUP" ? `${job.quantity} bag${job.quantity === 1 ? "" : "s"}` : null
-  return [bags, job.wasteType].filter(Boolean).join(" · ")
+  const bags =
+    job.type === "INSTANT_PICKUP"
+      ? `${job.quantity} bag${job.quantity === 1 ? "" : "s"}`
+      : job.type === "PLAN_PICKUP"
+        ? `Up to ${job.includedBags} bags`
+        : null
+  const bring = job.wastecoreBags ? `bring ${job.wastecoreBags} WasteCore bag${job.wastecoreBags === 1 ? "" : "s"}` : null
+  return [bags, job.wasteType, bring].filter(Boolean).join(" · ")
 }
 
 /** One job in a collector's list. */

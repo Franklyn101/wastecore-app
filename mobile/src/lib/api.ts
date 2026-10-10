@@ -45,6 +45,8 @@ import type {
   TimeWindow,
   User,
   WasteReport,
+  Pricing,
+  PricingView,
 } from "./types"
 
 // Set EXPO_PUBLIC_API_URL in mobile/.env for a real server. While developing on a phone
@@ -157,6 +159,7 @@ export type NewOrder =
       addressId: string
       wasteType: string
       bags: number
+      wastecoreBags: number
       asap: boolean
       pickupDate?: string
       timeWindow?: TimeWindow | null
@@ -309,6 +312,8 @@ export const api = {
       post<{ collector: Collector }>("/admin/collectors", body),
     updateCollector: (id: string, body: Partial<Omit<Collector, "id">>) =>
       patch<{ collector: Collector }>(`/admin/collectors/${id}`, body),
+    pricing: () => request<PricingView>("/admin/pricing"),
+    savePricing: (pricing: Pricing) => request<PricingView>("/admin/pricing", { method: "PUT", body: JSON.stringify(pricing) }),
     areas: () => request<{ areas: AdminArea[] }>("/admin/areas"),
     updateArea: (id: string, body: { active?: boolean; radiusKm?: number; autoAssign?: boolean; dailyCapacity?: number | null }) =>
       patch<{ area: ServiceArea }>(`/admin/areas/${id}`, body),
@@ -346,6 +351,7 @@ export const api = {
       if (input.photo) await appendImage(form, "proof", input.photo)
       return request<{ job: CollectorJob }>(`/collector/jobs/${id}/complete`, { method: "POST", body: form })
     },
-    incomplete: (id: string, reason: string) => post<{ job: CollectorJob }>(`/collector/jobs/${id}/incomplete`, { reason }),
+    incomplete: (id: string, reason: string, wastedTrip = false) =>
+      post<{ job: CollectorJob }>(`/collector/jobs/${id}/incomplete`, { reason, wastedTrip }),
   },
 }

@@ -140,7 +140,7 @@ describe("refunds", () => {
       .send({ amount: 700, reason: "Only 2 bags", cancel: false })
     expect(refund.status).toBe(201)
     expect(refund.body.refund).toMatchObject({ method: "PAYSTACK", status: "PENDING", amount: 700 })
-    expect(refund.body.left).toBe(1400)
+    expect(refund.body.left).toBe(2300) // 3 instant bags: ₦3,000
 
     // Paystack confirms it.
     const body = JSON.stringify({ event: "refund.processed", data: { id: Number(refund.body.refund.paystackId), status: "processed" } })
@@ -149,7 +149,7 @@ describe("refunds", () => {
     expect((await prisma.refund.findFirstOrThrow()).status).toBe("PROCESSED")
 
     const history = (await request(app).get("/payments").set(ada)).body
-    expect(history.total).toBe(2100 - 700)
+    expect(history.total).toBe(3000 - 700)
     const detail = (await request(app).get(`/orders/${order.body.order.id}`).set(ada)).body
     expect(detail.refunds[0]).toMatchObject({ amount: 700 })
     expect(await prisma.notification.count({ where: { title: "Refund on its way" } })).toBe(1)
@@ -163,7 +163,7 @@ describe("refunds", () => {
     const refund = await request(app)
       .post(`/admin/orders/${order.body.order.id}/refund`)
       .set(staff)
-      .send({ amount: 700, reason: "Customer moved away", cancel: true })
+      .send({ amount: 1500, reason: "Customer moved away", cancel: true })
     expect(refund.body.refund).toMatchObject({ method: "MANUAL", status: "PROCESSED" })
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.body.order.id } })).status).toBe("CANCELLED")
     expect((await request(app).post(`/admin/orders/${order.body.order.id}/refund`).set(staff).send({ amount: 100, reason: "again" })).status).toBe(409)
@@ -208,7 +208,7 @@ describe("dashboard and exports", () => {
 
     const dash = (await request(app).get("/admin/dashboard").set(staff)).body
     expect(dash.today).toMatchObject({ due: 1, unassigned: 1 })
-    expect(dash.revenue.today).toBe(1400)
+    expect(dash.revenue.today).toBe(1300) // 2 scheduled bags
     expect(dash.areas[0]).toMatchObject({ name: "Yenagoa", today: 1 })
 
     const csv = await request(app).get("/admin/exports/orders.csv").set(staff)
@@ -217,7 +217,7 @@ describe("dashboard and exports", () => {
     const lines = csv.text.trim().split("\r\n")
     expect(lines[0]).toMatch(/^Reference,Created,Type/)
     expect(lines[1]).toContain(order.body.order.reference)
-    expect((await request(app).get("/admin/exports/payments.csv").set(staff)).text).toContain("1400")
+    expect((await request(app).get("/admin/exports/payments.csv").set(staff)).text).toContain("1300")
     expect((await request(app).get("/admin/exports/secrets.csv").set(staff)).status).toBe(400)
     expect((await request(app).get("/admin/exports/orders.csv").set(ada)).status).toBe(403)
   })

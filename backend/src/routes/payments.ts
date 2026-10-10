@@ -83,8 +83,8 @@ paymentsRouter.post("/payments", requireUser, requireCustomer, async (req, res) 
     if (!order) throw new HttpError(404, "Order not found.")
     if (order.status === "AWAITING_PAYMENT") {
       target = { purpose: "ORDER", amount: order.amount, orderId: order.id }
-    } else if (order.status === "COMPLETED" && order.extraAmount > 0 && !order.extraPaidAt) {
-      // Extra bags the collector found at the pickup.
+    } else if ((order.status === "COMPLETED" || order.status === "INCOMPLETE") && order.extraAmount > 0 && !order.extraPaidAt) {
+      // Extra bags the collector found at the pickup, or a wasted-trip fee.
       target = { purpose: "ORDER_BALANCE", amount: order.extraAmount, orderId: order.id }
     } else {
       throw new HttpError(409, "This order doesn't need paying.")
@@ -135,7 +135,7 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
   ])
   const PURPOSE = { SUBSCRIPTION_START: "Plan started", SUBSCRIPTION_RENEWAL: "Plan renewed" }
   const describe = (p: (typeof online)[number]) => {
-    if (p.purpose === "ORDER_BALANCE" && p.order) return `Extra bags for ${p.order.reference}`
+    if (p.purpose === "ORDER_BALANCE" && p.order) return balanceDescription(p.order)
     if (p.order) return orderDescription(p.order)
     return `${PURPOSE[p.purpose as keyof typeof PURPOSE]}: ${findPlan(p.subscription!.plan).name}`
   }
@@ -163,7 +163,7 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
     ...cash.map((o) => ({
       id: `${o.id}-extra`,
       reference: o.reference,
-      description: `Extra bags for ${o.reference}`,
+      description: balanceDescription(o),
       amount: o.extraAmount,
       method: "Cash to collector",
       paidAt: o.extraPaidAt!,
@@ -188,8 +188,11 @@ paymentsRouter.get("/payments", requireUser, requireCustomer, async (req, res) =
 function orderDescription(o: Order) {
   if (o.type === "WASTE_BAGS") return `${planLabel(o.plan)} bags × ${o.quantity}`
   if (o.type === "SPECIAL_PICKUP") return `Special pickup: ${o.wasteType}`
-  return `Instant pickup, ${o.quantity} bag${o.quantity === 1 ? "" : "s"}`
+  const bags = `${planLabel(o.plan)}, ${o.quantity} bag${o.quantity === 1 ? "" : "s"}`
+  return o.wastecoreBags ? `${bags} + ${o.wastecoreBags} WasteCore bag${o.wastecoreBags === 1 ? "" : "s"}` : bags
 }
+
+const balanceDescription = (o: Order) => `${o.wastedTrip ? "Wasted-trip fee" : "Extra bags"} for ${o.reference}`
 
 // The app calls this after checkout closes to learn whether the payment went through.
 paymentsRouter.get("/payments/:reference", requireUser, requireCustomer, async (req, res) => {

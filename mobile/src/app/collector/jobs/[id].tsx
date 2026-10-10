@@ -10,6 +10,7 @@ import type { PickedImage } from "../../../lib/api"
 import { useCatalog } from "../../../lib/catalog"
 import { confirmAction } from "../../../lib/dialogs"
 import { formatDate, naira, pickupWhen } from "../../../lib/format"
+import { extraBagsPrice } from "../../../lib/pricing"
 import { directionsUrl } from "../../../lib/location"
 import { loadJob, runOrQueue } from "../../../lib/offline"
 import { useFocusData } from "../../../lib/useFocusData"
@@ -32,6 +33,7 @@ export default function Job() {
   const [reason, setReason] = useState("")
   const [bags, setBags] = useState<number | null>(null)
   const [cash, setCash] = useState(false)
+  const [wastedTrip, setWastedTrip] = useState(false)
   const [weight, setWeight] = useState("")
 
   const job = data?.job
@@ -40,8 +42,16 @@ export default function Job() {
   const open = job.status === "ASSIGNED"
   const isPickup = job.type !== "WASTE_BAGS"
   const bagCount = bags ?? job.quantity
-  // Extra bags on a one-off pickup are charged per bag; plans include their pickups.
-  const extra = job.type === "INSTANT_PICKUP" && catalog ? Math.max(0, bagCount - job.quantity) * catalog.instantPickup.pricePerBag : 0
+  const pricing = catalog?.pickupPricing
+  const extraBags = Math.max(0, bagCount - job.includedBags)
+  // Bags beyond what was paid for: priced as if booked (one-off pickups), or per extra bag (plans).
+  const extra = !pricing || !extraBags
+    ? 0
+    : job.type === "INSTANT_PICKUP"
+      ? extraBagsPrice(job.includedBags, bagCount, job.instant, pricing)
+      : job.type === "PLAN_PICKUP"
+        ? extraBags * pricing.scheduled.extraBag
+        : 0
 
   // Sends the action, or saves it on the phone to send when there's signal.
   const apply = (step: Parameters<typeof runOrQueue>[1]) =>
@@ -156,7 +166,7 @@ export default function Job() {
           {isPickup ? (
             <Stepper
               label="Bags collected"
-              hint={`Booked: ${job.quantity}`}
+              hint={job.type === "PLAN_PICKUP" ? `Plan includes ${job.includedBags}` : `Booked: ${job.includedBags}`}
               value={bagCount}
               onChange={setBags}
               max={200}
@@ -166,7 +176,7 @@ export default function Job() {
           {extra > 0 ? (
             <View style={{ backgroundColor: colors.warningSoft, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm }}>
               <Text style={[font.label, { color: colors.warning }]}>
-                {bagCount - job.quantity} extra bag{bagCount - job.quantity === 1 ? "" : "s"}: {naira(extra)}
+                {extraBags} extra bag{extraBags === 1 ? "" : "s"}: {naira(extra)}
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                 <Text style={[font.body, { flex: 1 }]}>Customer paid me {naira(extra)} in cash</Text>
@@ -216,14 +226,37 @@ export default function Job() {
             ))}
           </View>
           <TextField label="Reason" value={reason} onChangeText={setReason} multiline maxLength={500} />
+          {isPickup && job.type !== "SPECIAL_PICKUP" && pricing ? (
+            <View style={{ backgroundColor: colors.warningSoft, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <Text style={[font.label, { flex: 1 }]}>Wasted trip</Text>
+                <Switch
+                  {...switchColors}
+                  accessibilityLabel="Wasted trip"
+                  value={wastedTrip}
+                  onValueChange={setWastedTrip}
+                  trackColor={{ true: colors.primary }}
+                />
+              </View>
+              <Text style={font.muted}>
+                I came and there was no waste or nobody home. The customer pays a {naira(pricing.wastedTripFee)} fee and you're paid for
+                the trip.
+              </Text>
+            </View>
+          ) : null}
           <Button
             title="Close job as not done"
             variant="danger"
             loading={action.busy}
             disabled={reason.trim().length < 3}
             onPress={() =>
-              confirmAction("Close this job?", "It will be marked as not completed.", "Close job", () =>
-                apply({ kind: "incomplete", jobId: job.id, reason: reason.trim() }),
+              confirmAction(
+                "Close this job?",
+                wastedTrip && pricing
+                  ? `It will be marked as a wasted trip, and the customer charged ${naira(pricing.wastedTripFee)}.`
+                  : "It will be marked as not completed.",
+                "Close job",
+                () => apply({ kind: "incomplete", jobId: job.id, reason: reason.trim(), wastedTrip: wastedTrip && job.type !== "SPECIAL_PICKUP" }),
               )
             }
           />
@@ -234,13 +267,22 @@ export default function Job() {
       {!open ? (
         <Card>
           <Text style={font.heading}>
-            {job.status === "COMPLETED" ? "Completed" : job.status === "INCOMPLETE" ? "Not completed" : "Cancelled by the office"}
+            {job.status === "COMPLETED"
+              ? "Completed"
+              : job.wastedTrip
+                ? "Wasted trip"
+                : job.status === "INCOMPLETE"
+                  ? "Not completed"
+                  : "Cancelled by the office"}
           </Text>
           {job.completedAt ? <Row label="Closed" value={formatDate(job.completedAt)} /> : null}
           {job.bagsCollected !== null ? <Row label="Bags collected" value={String(job.bagsCollected)} /> : null}
           {job.weightKg !== null ? <Row label="Weight" value={`${job.weightKg} kg`} /> : null}
           {job.extraAmount > 0 ? (
-            <Row label="Extra bags" value={`${naira(job.extraAmount)} · ${job.extraPaid ? "paid" : "customer to pay in app"}`} />
+            <Row
+              label={job.wastedTrip ? "Wasted-trip fee" : "Extra bags"}
+              value={`${naira(job.extraAmount)} · ${job.extraPaid ? "paid" : "customer to pay in app"}`}
+            />
           ) : null}
           {job.pay !== null ? <Row label="You earn" value={naira(job.pay)} /> : null}
           {job.collectorNote ? <Row label="Your note" value={job.collectorNote} /> : null}

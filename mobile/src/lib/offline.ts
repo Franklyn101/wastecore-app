@@ -14,7 +14,7 @@ const QUEUE_KEY = "wc.collector.queue"
 export type QueuedAction =
   | { id: string; jobId: string; kind: "onTheWay"; queuedAt: string }
   | { id: string; jobId: string; kind: "complete"; input: CompleteJob; queuedAt: string }
-  | { id: string; jobId: string; kind: "incomplete"; reason: string; queuedAt: string }
+  | { id: string; jobId: string; kind: "incomplete"; reason: string; wastedTrip?: boolean; queuedAt: string }
 
 /** Distributes Omit over the union, so each action keeps its own fields. */
 type NewAction = QueuedAction extends infer A ? (A extends QueuedAction ? Omit<A, "id" | "queuedAt"> : never) : never
@@ -113,7 +113,7 @@ export async function runOrQueue(job: CollectorJob, action: NewAction): Promise<
 function send(action: NewAction | QueuedAction) {
   if (action.kind === "onTheWay") return api.collector.onTheWay(action.jobId)
   if (action.kind === "complete") return api.collector.complete(action.jobId, action.input)
-  return api.collector.incomplete(action.jobId, action.reason)
+  return api.collector.incomplete(action.jobId, action.reason, action.wastedTrip)
 }
 
 let flushing: Promise<{ sent: number; failed: string[] }> | null = null
