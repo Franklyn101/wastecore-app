@@ -65,8 +65,8 @@ export const DEFAULT_PRICING: Pricing = {
     weekly_2: { price: 12000, bagsPerPickup: 3 },
     weekly_3: { price: 18000, bagsPerPickup: 3 },
     basic: { price: 12000, bagsPerPickup: 5 },
-    standard: { price: 30000, bagsPerPickup: 5 },
-    premium: { price: 65000, bagsPerPickup: 5 },
+    standard: { price: 20000, bagsPerPickup: 5 },
+    premium: { price: 35000, bagsPerPickup: 5 },
   },
 }
 

@@ -170,13 +170,13 @@ describe("subscriptions", () => {
       data: { currentPeriodStart: addDays(today(), -14), currentPeriodEnd: addDays(today(), 14) },
     })
     const quote = await request(app).get(`/subscriptions/${oldId}/change-quote`).query({ plan: "premium" }).set(auth)
-    expect(quote.body.quote).toMatchObject({ credit: 3000, amountDue: 62000, allowed: true })
+    expect(quote.body.quote).toMatchObject({ credit: 3000, amountDue: 32000, allowed: true })
 
     const change = await request(app).post(`/subscriptions/${oldId}/change`).set(auth).send({ plan: "premium" })
     expect(change.status).toBe(201)
     const newId = change.body.subscription.id
     const start = await request(app).post("/payments").set(auth).send({ subscriptionId: newId, email: "ada@example.com" })
-    expect(start.body.payment.amount).toBe(62000)
+    expect(start.body.payment.amount).toBe(32000)
     paystack.pay(start.body.payment.reference)
     await request(app).get(`/payments/${start.body.payment.reference}`).set(auth)
 
