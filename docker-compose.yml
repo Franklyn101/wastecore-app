@@ -11,7 +11,12 @@
 # To try it on a phone with Expo Go, put your computer's Wi-Fi address in a file named .env
 # next to this one (WASTECORE_HOST=192.168.1.20) before starting. See "On a phone" in the README.
 #
-# Payments go to a stand-in Paystack checkout (no real money); texts and emails are caught
+# To use Paystack's real test checkout instead, also put these two lines in .env (test key only,
+# never your live key on this computer):
+#   PAYSTACK_SECRET_KEY=sk_test_...
+#   PAYSTACK_BASE_URL=https://api.paystack.co
+#
+# Payments otherwise go to a stand-in Paystack checkout (no real money); texts and emails are caught
 # locally and never sent. Demo logins are listed in the README.
 # This setup is for testing only: its passwords and keys are public. Don't deploy it as is.
 
@@ -44,8 +49,9 @@ services:
       PUBLIC_URL: http://${WASTECORE_HOST:-localhost}:4000
       # The app is opened at localhost:8081 in a browser, or through Expo Go on a phone.
       APP_RETURN_URLS: http://localhost:8081/,http://${WASTECORE_HOST:-localhost}:8081/,exp://,exps://,wastecore://
-      PAYSTACK_SECRET_KEY: sk_test_local
-      PAYSTACK_BASE_URL: http://paystack:4599
+      # The stand-in checkout, unless .env has your own Paystack test key (see the top of this file).
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-sk_test_local}
+      PAYSTACK_BASE_URL: ${PAYSTACK_BASE_URL:-http://paystack:4599}
       TERMII_API_KEY: local
       TERMII_SENDER_ID: WasteCore
       TERMII_BASE_URL: http://sms:4597
