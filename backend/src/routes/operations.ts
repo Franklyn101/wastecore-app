@@ -90,7 +90,7 @@ operationsRouter.get("/admin/customers", async (req, res) => {
   const { q, suspended } = z
     .object({ q: z.string().trim().max(100).optional(), suspended: z.enum(["true", "false"]).optional() })
     .parse(req.query)
-  const where: Prisma.UserWhereInput = { role: "CUSTOMER" }
+  const where: Prisma.UserWhereInput = { role: "CUSTOMER", deletedAt: null }
   if (suspended) where.suspendedAt = suspended === "true" ? { not: null } : null
   if (q) {
     const digits = q.replace(/\D/g, "").replace(/^0/, "")
@@ -352,7 +352,7 @@ operationsRouter.get("/admin/exports/:kind.csv", requireOwner, async (req, res) 
   }
   if (kind === "customers") {
     const users = await prisma.user.findMany({
-      where: { role: "CUSTOMER", createdAt: created },
+      where: { role: "CUSTOMER", deletedAt: null, createdAt: created },
       include: { _count: { select: { orders: true } } },
       orderBy: { createdAt: "asc" },
     })

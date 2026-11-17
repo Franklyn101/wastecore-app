@@ -182,6 +182,7 @@ export const api = {
   verifyPhone: (code: string) => post<{ user: User }>("/me/phone/verify", { code }),
   changePassword: (body: { currentPassword: string; password: string }) => post<AuthResponse>("/me/password", body),
   updateProfile: (body: { name?: string; address?: string; email?: string }) => patch<{ user: User }>("/me", body),
+  deleteAccount: (password: string) => request<{ ok: true }>("/me", { method: "DELETE", body: JSON.stringify({ password }) }),
 
   catalog: () => request<Catalog>("/catalog"),
 

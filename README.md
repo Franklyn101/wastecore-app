@@ -131,6 +131,16 @@ New customers and collectors get a 6-digit code by SMS when they sign up, and en
 
 Set `TERMII_*` and `SMTP_*` in `backend/.env` (see `.env.example`). For SMS to reach numbers on Do-Not-Disturb (most Nigerian lines), Termii needs an approved sender ID and the `dnd` channel. Without these settings, codes are printed in the server log, which is fine for local development.
 
+## Deleting an account
+
+Customers and collectors can delete their own account under **Account → Delete account** (the App Store and Google Play require this). They confirm with their password.
+
+- **What goes:** name, phone number, email, saved addresses and map pins, support tickets, special-waste quotes, notifications and notes or photos on their orders. They're signed out everywhere and can't sign in again. The phone number is freed, so it can sign up afresh.
+- **What stays:** order references, amounts, dates and payments, with the address replaced by "Removed (account deleted)", so the books still add up. The account shows as "Deleted account" and no longer appears in the staff customer list or the customer export.
+- **What stops:** unpaid orders and upcoming plan pickups are cancelled, and the plan ends at once, with no refund for days left. The saved card is removed, so nothing renews.
+- **When it has to wait:** a customer can't delete while a collector is on the way, while a paid order (or a transfer receipt being checked) isn't done yet, while a refund is still processing, or while they owe for extra bags. A collector can't delete while jobs are assigned to them. Their collector record stays for past jobs and payouts, but it's marked inactive and no longer has a login.
+- **Staff accounts** can't be deleted from the app. The main admin removes staff access.
+
 ## Notifications
 
 Customers, collectors and staff get **push notifications** on their phones, and every alert is also kept in the app's notification list (the bell at the top right, with an unread count). Tapping one opens the order, job or plan it's about.
@@ -287,6 +297,7 @@ All endpoints take and return JSON. Authenticated endpoints need `Authorization:
 | POST | `/admin/users/password` | admin | `{ phone, password }`: temporary password for a customer or collector |
 | POST | `/auth/login` | public | `{ phone, password }` → `{ token, user }` (customers, staff and collectors) |
 | GET / PATCH | `/me` | customer | Read or update name and default address |
+| DELETE | `/me` | customer, collector | `{ password }`: deletes the account (409 with the reason if something must be settled first) |
 | GET | `/catalog` | public | Plans, prices, waste types, support categories, bank details |
 | GET | `/areas` | public | Cities in launch order, with centre, radius and whether they're live |
 | GET | `/areas/locate?lat=&lng=` | public | Whether a pinned spot is served, which city it's in, and the nearest city |

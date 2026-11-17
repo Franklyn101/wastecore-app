@@ -62,6 +62,7 @@ export default function Account() {
       <Button title="Payment history" variant="secondary" onPress={() => router.push("/payments")} />
       <Button title="Prices and how to pay" variant="secondary" onPress={() => router.push("/prices")} />
       <Button title="Change password" variant="secondary" onPress={() => router.push("/change-password")} />
+      <Button title="Delete account" variant="secondary" onPress={() => router.push("/delete-account")} />
       <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
     </Screen>
   )

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs"
 import { Router } from "express"
 import rateLimit from "express-rate-limit"
 import { z } from "zod"
+import { deleteAccount } from "../account.ts"
 import { currentUser, publicUser, requireUser, signToken, SUSPENDED_MESSAGE } from "../auth.ts"
 import { config } from "../config.ts"
 import { issueCode } from "../codes.ts"
@@ -145,4 +146,11 @@ authRouter.patch("/me", requireUser, async (req, res) => {
   const body = updateProfileSchema.parse(req.body)
   const user = await prisma.user.update({ where: { id: currentUser(req).id }, data: body })
   res.json({ user: publicUser(user) })
+})
+
+// The person deletes their own account (App Store and Play Store rules). Needs their password.
+authRouter.delete("/me", authLimiter, requireUser, async (req, res) => {
+  const { password } = z.object({ password: z.string().min(1, "Enter your password.") }).parse(req.body ?? {})
+  await deleteAccount(currentUser(req), password)
+  res.json({ ok: true })
 })

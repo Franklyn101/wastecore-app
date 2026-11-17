@@ -84,6 +84,7 @@ function RootNavigator() {
         <Stack.Protected guard={!!user}>
           <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
           <Stack.Screen name="change-password" options={{ title: "Change password" }} />
+          <Stack.Screen name="delete-account" options={{ title: "Delete account" }} />
         </Stack.Protected>
       </Stack>
       <AppTabBar />

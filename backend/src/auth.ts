@@ -41,7 +41,7 @@ export async function requireUser(req: Request, _res: Response, next: NextFuncti
     throw new HttpError(401, "Your session has expired. Please sign in again.")
   }
   const user = claims.sub ? await prisma.user.findUnique({ where: { id: claims.sub } }) : null
-  if (!user) throw new HttpError(401, "Your session has expired. Please sign in again.")
+  if (!user || user.deletedAt) throw new HttpError(401, "Your session has expired. Please sign in again.")
   // Tokens from before the last password change no longer work.
   if ((claims.pv ?? 0) !== passwordVersion(user)) {
     throw new HttpError(401, "Your password was changed. Please sign in again.")
