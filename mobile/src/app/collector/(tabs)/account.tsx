@@ -23,6 +23,7 @@ export default function CollectorAccount() {
       <Text style={font.muted}>To change your name, phone or area, ask the WasteCore office.</Text>
       <Button title="Earnings and how pay works" variant="secondary" onPress={() => router.push("/collector/earnings")} />
       <Button title="Change password" variant="secondary" onPress={() => router.push("/change-password")} />
+      <Button title="Delete account" variant="secondary" onPress={() => router.push("/delete-account")} />
       <Button
         title="Sign out"
         variant="danger"

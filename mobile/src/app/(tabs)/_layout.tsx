@@ -10,7 +10,7 @@ type IconName = ComponentProps<typeof Ionicons>["name"]
 
 const icon =
   (name: IconName) =>
-  ({ color, size }: { color: ColorValue; size: number }) => <Ionicons name={name} color={color} size={size} />
+  ({ color, size }: { color: ColorValue; size: number }) => <Ionicons name={name} color={color as string} size={size} />
 
 export default function TabsLayout() {
   return (
