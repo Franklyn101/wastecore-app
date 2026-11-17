@@ -9,7 +9,7 @@ It follows the WasteCore WhatsApp bot's service flow as a native app, but it is 
 ```
 wastecore-app/
 ├── backend/   Express 5 + TypeScript API, PostgreSQL via Prisma, JWT auth
-└── mobile/    Expo (SDK 57) app with Expo Router, for iOS, Android and web
+└── mobile/    Expo (SDK 58) app with Expo Router, for iOS, Android and web
 ```
 
 ## What the app does
